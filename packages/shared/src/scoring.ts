@@ -18,7 +18,8 @@ export function calculateTotalScore(cards: CardSlot[]): number {
  * Returns the column index if found, or -1 if no column matches.
  */
 export function findMatchingColumn(cards: CardSlot[]): number {
-  for (let col = 0; col < COLS; col++) {
+  const numCols = Math.floor(cards.length / ROWS);
+  for (let col = 0; col < numCols; col++) {
     const indices = getColumnIndices(col);
     const columnCards = indices.map((i) => cards[i]);
 
@@ -40,8 +41,9 @@ export function findMatchingColumn(cards: CardSlot[]): number {
  * Cards are re-indexed: remaining columns shift left.
  */
 export function removeColumn(cards: CardSlot[], colToRemove: number): CardSlot[] {
+  const numCols = Math.floor(cards.length / ROWS);
   const newCards: CardSlot[] = [];
-  for (let col = 0; col < COLS; col++) {
+  for (let col = 0; col < numCols; col++) {
     if (col === colToRemove) continue;
     const indices = getColumnIndices(col);
     for (const i of indices) {

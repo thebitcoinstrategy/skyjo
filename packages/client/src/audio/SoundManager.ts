@@ -29,6 +29,8 @@ class SoundManagerClass {
   private music: Howl | null = null;
   private initialized = false;
   private audioContext: AudioContext | null = null;
+  private currentTrackIndex = -1;
+  private trackHistory: number[] = [];
 
   init() {
     if (this.initialized) return;
@@ -346,135 +348,129 @@ class SoundManagerClass {
     const settings = useSettingsStore.getState();
     if (!settings.musicEnabled) return;
 
-    if (!this.music) {
-      this.music = this.createMusicLoop(settings.musicVolume);
+    // Pick a different track each time
+    this.pickNextTrack();
+    if (this.music) {
+      this.music.stop();
+      this.music.unload();
     }
-
+    this.music = this.createMusicTrack(this.currentTrackIndex, settings.musicVolume);
     this.music.play();
   }
 
+  private pickNextTrack() {
+    const total = 20;
+    let next: number;
+    do {
+      next = Math.floor(Math.random() * total);
+    } while (next === this.currentTrackIndex && total > 1);
+    this.currentTrackIndex = next;
+  }
+
   /**
-   * Generates a fun lounge/bossa-nova style background loop.
-   * 16-bar progression at 110 BPM with bass, chords, and light percussion.
+   * Generates one of 20 distinct procedural music loops.
+   * Each has unique tempo, key, chord progression, and rhythm style.
    */
-  private createMusicLoop(volume: number): Howl {
+  private createMusicTrack(trackIndex: number, volume: number): Howl {
     const sampleRate = 44100;
-    const bpm = 110;
-    const beatsPerBar = 4;
-    const bars = 16;
-    const totalBeats = bars * beatsPerBar;
-    const beatDuration = 60 / bpm;
-    const duration = totalBeats * beatDuration;
+    const tracks = this.getTrackDefinitions();
+    const def = tracks[trackIndex % tracks.length];
+    const beatDuration = 60 / def.bpm;
+    const duration = def.bars * def.beatsPerBar * beatDuration;
     const numSamples = Math.floor(sampleRate * duration);
     const buffer = new ArrayBuffer(44 + numSamples * 2);
     const view = new DataView(buffer);
+    this.writeWavHeader(view, numSamples, sampleRate);
 
-    // WAV header
-    const writeString = (offset: number, str: string) => {
-      for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
-    };
-    writeString(0, 'RIFF');
-    view.setUint32(4, 36 + numSamples * 2, true);
-    writeString(8, 'WAVE');
-    writeString(12, 'fmt ');
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, 1, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * 2, true);
-    view.setUint16(32, 2, true);
-    view.setUint16(34, 16, true);
-    writeString(36, 'data');
-    view.setUint32(40, numSamples * 2, true);
-
-    // Chord progression (2 bars each): Cmaj7 → Am7 → Dm7 → G7 → Em7 → Am7 → Dm7 → G7
-    const chords = [
-      [261.63, 329.63, 392.00, 493.88],  // Cmaj7: C4 E4 G4 B4
-      [220.00, 261.63, 329.63, 392.00],  // Am7:   A3 C4 E4 G4
-      [293.66, 349.23, 440.00, 523.25],  // Dm7:   D4 F4 A4 C5
-      [196.00, 246.94, 293.66, 349.23],  // G7:    G3 B3 D4 F4
-      [164.81, 196.00, 246.94, 293.66],  // Em7:   E3 G3 B3 D4
-      [220.00, 261.63, 329.63, 392.00],  // Am7
-      [293.66, 349.23, 440.00, 523.25],  // Dm7
-      [196.00, 246.94, 293.66, 349.23],  // G7
-    ];
-
-    // Bass notes (root of each chord, one octave lower)
-    const bassNotes = [130.81, 110.00, 146.83, 98.00, 82.41, 110.00, 146.83, 98.00];
-
-    // Pseudo-random for deterministic percussion
-    let seed = 42;
+    let seed = trackIndex * 1337 + 42;
     const rand = () => { seed = (seed * 16807 + 0) % 2147483647; return seed / 2147483647; };
 
     for (let i = 0; i < numSamples; i++) {
       const t = i / sampleRate;
       const beat = t / beatDuration;
-      const bar = Math.floor(beat / beatsPerBar);
-      const beatInBar = beat % beatsPerBar;
-      const chordIdx = Math.floor(bar / 2) % chords.length;
-      const chord = chords[chordIdx];
-      const bassFreq = bassNotes[chordIdx];
-
+      const bar = Math.floor(beat / def.beatsPerBar);
+      const chordIdx = Math.floor(bar / def.barsPerChord) % def.chords.length;
+      const chord = def.chords[chordIdx];
+      const bassFreq = def.bassNotes[chordIdx];
       let sample = 0;
 
-      // ── Pad chords (warm, low-pass sine with slow attack/release) ──
-      const chordBarStart = Math.floor(bar / 2) * 2 * beatsPerBar * beatDuration;
+      // ── Pad chords ──
+      const chordBarStart = Math.floor(bar / def.barsPerChord) * def.barsPerChord * def.beatsPerBar * beatDuration;
       const chordTime = t - chordBarStart;
-      const chordEnv = Math.min(1, chordTime / 0.3) * Math.min(1, Math.max(0, (2 * beatsPerBar * beatDuration - chordTime) / 0.3));
+      const chordLen = def.barsPerChord * def.beatsPerBar * beatDuration;
+      const chordEnv = Math.min(1, chordTime / 0.3) * Math.min(1, Math.max(0, (chordLen - chordTime) / 0.3));
       for (const freq of chord) {
-        sample += Math.sin(2 * Math.PI * freq * t) * 0.04 * chordEnv;
-      }
-
-      // ── Bass (plucked style on beats 1 and 3) ──
-      const bassBeats = [0, 2]; // beat 1 and 3
-      for (const bb of bassBeats) {
-        const bassStart = (Math.floor(beat / beatsPerBar) * beatsPerBar + bb) * beatDuration;
-        const bt = t - bassStart;
-        if (bt >= 0 && bt < beatDuration * 1.5) {
-          const bassEnv = Math.exp(-bt * 4) * 0.12;
-          sample += Math.sin(2 * Math.PI * bassFreq * t) * bassEnv;
-          // Add a subtle octave harmonic
-          sample += Math.sin(2 * Math.PI * bassFreq * 2 * t) * bassEnv * 0.3;
+        sample += Math.sin(2 * Math.PI * freq * t) * def.padVol * chordEnv;
+        if (def.padDetune) {
+          sample += Math.sin(2 * Math.PI * freq * 1.003 * t) * def.padVol * chordEnv * 0.5;
         }
       }
 
-      // ── Bossa rhythm guitar (offbeat stabs) ──
-      const subBeat = (beat * 2) % 2;
-      if (subBeat > 0.9 && subBeat < 1.1) {
-        // Offbeat strum
-        const strumStart = Math.floor(beat + 0.5) * beatDuration - beatDuration * 0.5;
-        const st = t - strumStart;
-        if (st >= 0 && st < 0.15) {
-          const strumEnv = Math.exp(-st * 25) * 0.06;
-          for (const freq of chord) {
-            sample += Math.sin(2 * Math.PI * freq * 1.5 * t) * strumEnv;
+      // ── Bass ──
+      for (const bb of def.bassBeats) {
+        const bassStart = (Math.floor(beat / def.beatsPerBar) * def.beatsPerBar + bb) * beatDuration;
+        const bt = t - bassStart;
+        if (bt >= 0 && bt < beatDuration * 1.5) {
+          const bassEnv = Math.exp(-bt * def.bassDecay) * def.bassVol;
+          sample += Math.sin(2 * Math.PI * bassFreq * t) * bassEnv;
+          sample += Math.sin(2 * Math.PI * bassFreq * 2 * t) * bassEnv * 0.25;
+        }
+      }
+
+      // ── Rhythm stabs ──
+      if (def.rhythmPattern) {
+        for (const rp of def.rhythmPattern) {
+          const rpBeat = (beat % def.beatsPerBar);
+          if (Math.abs(rpBeat - rp) < 0.08) {
+            const rpStart = (Math.floor(beat / def.beatsPerBar) * def.beatsPerBar + rp) * beatDuration;
+            const rt = t - rpStart;
+            if (rt >= 0 && rt < 0.15) {
+              const strumEnv = Math.exp(-rt * 25) * 0.05;
+              for (const freq of chord) {
+                sample += Math.sin(2 * Math.PI * freq * 1.5 * t) * strumEnv;
+              }
+            }
           }
         }
       }
 
-      // ── Light hi-hat (8th notes) ──
-      const eighthBeat = beat * 2;
-      const eighthPos = eighthBeat % 1;
-      if (eighthPos < 0.05) {
-        const ht = eighthPos * beatDuration / 2;
-        const hihatEnv = Math.exp(-ht * 600) * 0.015;
-        sample += (rand() * 2 - 1) * hihatEnv;
+      // ── Hi-hat ──
+      if (def.hihat) {
+        const hhDiv = def.hihat;
+        const hhBeat = beat * hhDiv;
+        const hhPos = hhBeat % 1;
+        if (hhPos < 0.05) {
+          const ht = hhPos * beatDuration / hhDiv;
+          const hihatEnv = Math.exp(-ht * 500) * 0.012;
+          sample += (rand() * 2 - 1) * hihatEnv;
+        }
       }
 
-      // ── Soft kick on beats 1 and 3 ──
-      const kickBeats = [0, 2];
-      for (const kb of kickBeats) {
-        const kickStart = (Math.floor(beat / beatsPerBar) * beatsPerBar + kb) * beatDuration;
+      // ── Kick ──
+      for (const kb of def.kickBeats) {
+        const kickStart = (Math.floor(beat / def.beatsPerBar) * def.beatsPerBar + kb) * beatDuration;
         const kt = t - kickStart;
         if (kt >= 0 && kt < 0.12) {
-          const kickEnv = Math.exp(-kt * 40) * 0.08;
-          const kickFreq = 60 * Math.exp(-kt * 30);
+          const kickEnv = Math.exp(-kt * 40) * 0.07;
+          const kickFreq = 55 * Math.exp(-kt * 30);
           sample += Math.sin(2 * Math.PI * kickFreq * kt) * kickEnv;
         }
       }
 
-      // Soft clamp and write
-      sample = Math.tanh(sample * 2) * 0.5; // Soft clip
+      // ── Optional melody ──
+      if (def.melody) {
+        const melodyBeat = Math.floor(beat) % def.melody.length;
+        const mFreq = def.melody[melodyBeat];
+        if (mFreq > 0) {
+          const mStart = Math.floor(beat) * beatDuration;
+          const mt = t - mStart;
+          const mEnv = Math.exp(-mt * 5) * 0.04;
+          sample += Math.sin(2 * Math.PI * mFreq * t) * mEnv;
+          sample += Math.sin(2 * Math.PI * mFreq * 2 * t) * mEnv * 0.15;
+        }
+      }
+
+      sample = Math.tanh(sample * 2) * 0.5;
       const value = Math.max(-32768, Math.min(32767, Math.floor(sample * 32767)));
       view.setInt16(44 + i * 2, value, true);
     }
@@ -490,8 +486,145 @@ class SoundManagerClass {
     });
   }
 
+  private getTrackDefinitions() {
+    // Helper: note frequency calculator
+    const n = (semitones: number) => 440 * Math.pow(2, semitones / 12);
+    // Common note frequencies (A4=440)
+    const C3=130.81, D3=146.83, E3=164.81, F3=174.61, G3=196.00, A3=220.00, Bb3=233.08, B3=246.94;
+    const C4=261.63, D4=293.66, Eb4=311.13, E4=329.63, F4=349.23, Gb4=369.99, G4=392.00, Ab4=415.30, A4=440.00, Bb4=466.16, B4=493.88;
+    const C5=523.25, D5=587.33, E5=659.25, F5=698.46, G5=783.99, A5=880.00;
+
+    type TrackDef = {
+      bpm: number; bars: number; beatsPerBar: number; barsPerChord: number;
+      chords: number[][]; bassNotes: number[]; bassBeats: number[]; bassDecay: number; bassVol: number;
+      padVol: number; padDetune?: boolean;
+      rhythmPattern?: number[]; hihat?: number; kickBeats: number[];
+      melody?: number[];
+    };
+
+    const tracks: TrackDef[] = [
+      // 0: Bossa Nova (original style)
+      { bpm:110, bars:16, beatsPerBar:4, barsPerChord:2,
+        chords:[[C4,E4,G4,B4],[A3,C4,E4,G4],[D4,F4,A4,C5],[G3,B3,D4,F4],[E3,G3,B3,D4],[A3,C4,E4,G4],[D4,F4,A4,C5],[G3,B3,D4,F4]],
+        bassNotes:[C3,A3,D3,G3,E3,A3,D3,G3], bassBeats:[0,2], bassDecay:4, bassVol:0.12,
+        padVol:0.04, rhythmPattern:[0.5,1.5,2.5,3.5], hihat:2, kickBeats:[0,2] },
+      // 1: Jazz Waltz
+      { bpm:130, bars:24, beatsPerBar:3, barsPerChord:2,
+        chords:[[D4,Gb4,A4],[G3,B3,D4,F4],[C4,E4,G4,B4],[F4,A4,C5],[Bb3,D4,F4],[E3,G3,B3,D4]],
+        bassNotes:[D3,G3,C3,F3,Bb3,E3], bassBeats:[0], bassDecay:3, bassVol:0.10,
+        padVol:0.035, padDetune:true, rhythmPattern:[1,2], hihat:3, kickBeats:[0] },
+      // 2: Cool Lounge
+      { bpm:95, bars:16, beatsPerBar:4, barsPerChord:2,
+        chords:[[E4,Ab4,B4],[A3,C4,E4,G4],[D4,F4,A4,C5],[G3,B3,D4]],
+        bassNotes:[E3,A3,D3,G3], bassBeats:[0,2.5], bassDecay:5, bassVol:0.11,
+        padVol:0.04, padDetune:true, hihat:2, kickBeats:[0,2],
+        melody:[E5,0,D5,0,C5,0,B4,0,A4,0,G4,0,A4,0,B4,0] },
+      // 3: Upbeat Funk
+      { bpm:120, bars:16, beatsPerBar:4, barsPerChord:2,
+        chords:[[E4,G4,B4,D5],[A3,C4,E4,G4],[D4,F4,A4,C5],[G3,Bb3,D4,F4]],
+        bassNotes:[E3,A3,D3,G3], bassBeats:[0,0.75,2,2.75], bassDecay:6, bassVol:0.13,
+        padVol:0.03, rhythmPattern:[0.5,1,2.5,3], hihat:4, kickBeats:[0,1.5,2,3.5] },
+      // 4: Dreamy Ambient
+      { bpm:72, bars:16, beatsPerBar:4, barsPerChord:4,
+        chords:[[C4,E4,G4,B4],[F4,A4,C5,E5],[G4,B4,D5],[A3,C4,E4]],
+        bassNotes:[C3,F3,G3,A3], bassBeats:[0], bassDecay:2, bassVol:0.08,
+        padVol:0.06, padDetune:true, kickBeats:[0],
+        melody:[G5,0,0,0,E5,0,0,0,D5,0,0,0,C5,0,0,0] },
+      // 5: Reggae Chill
+      { bpm:85, bars:16, beatsPerBar:4, barsPerChord:2,
+        chords:[[C4,Eb4,G4],[F4,Ab4,C5],[G4,Bb4,D5],[C4,Eb4,G4]],
+        bassNotes:[C3,F3,G3,C3], bassBeats:[0,2.5], bassDecay:4, bassVol:0.12,
+        padVol:0.035, rhythmPattern:[1.5,3.5], hihat:2, kickBeats:[0,2] },
+      // 6: Latin Salsa Light
+      { bpm:105, bars:16, beatsPerBar:4, barsPerChord:2,
+        chords:[[A3,C4,E4],[D4,F4,A4],[G3,B3,D4],[C4,E4,G4]],
+        bassNotes:[A3,D3,G3,C3], bassBeats:[0,1.5,2,3.5], bassDecay:5, bassVol:0.11,
+        padVol:0.03, rhythmPattern:[0.5,1,2.5,3], hihat:4, kickBeats:[0,2] },
+      // 7: Blues Shuffle
+      { bpm:100, bars:24, beatsPerBar:4, barsPerChord:2,
+        chords:[[C4,Eb4,G4,Bb4],[C4,Eb4,G4,Bb4],[F4,Ab4,C5,Eb4],[F4,Ab4,C5,Eb4],[G4,B4,D5,F4],[F4,Ab4,C5,Eb4],[C4,Eb4,G4,Bb4],[G3,B3,D4,F4],[C4,Eb4,G4,Bb4],[C4,Eb4,G4,Bb4],[F4,Ab4,C5,Eb4],[G4,B4,D5,F4]],
+        bassNotes:[C3,C3,F3,F3,G3,F3,C3,G3,C3,C3,F3,G3], bassBeats:[0,2], bassDecay:4, bassVol:0.12,
+        padVol:0.035, rhythmPattern:[1.33,2.67], hihat:3, kickBeats:[0,2] },
+      // 8: Mellow Electronica
+      { bpm:118, bars:16, beatsPerBar:4, barsPerChord:4,
+        chords:[[A3,C4,E4,G4],[F4,A4,C5],[D4,F4,A4,C5],[E3,G3,B3]],
+        bassNotes:[A3,F3,D3,E3], bassBeats:[0,1,2,3], bassDecay:8, bassVol:0.10,
+        padVol:0.05, padDetune:true, hihat:4, kickBeats:[0,2],
+        melody:[0,E5,0,C5,0,A4,0,E5,0,F5,0,E5,0,D5,0,C5] },
+      // 9: Tropical Vibes
+      { bpm:108, bars:16, beatsPerBar:4, barsPerChord:2,
+        chords:[[C4,E4,G4],[F4,A4,C5],[G4,B4,D5],[A3,C4,E4]],
+        bassNotes:[C3,F3,G3,A3], bassBeats:[0,2.5], bassDecay:5, bassVol:0.11,
+        padVol:0.04, rhythmPattern:[0.5,1.5,2.5,3.5], hihat:4, kickBeats:[0,1.5,2,3.5],
+        melody:[G5,0,E5,0,C5,0,E5,G5,A5,0,G5,0,E5,0,D5,0] },
+      // 10: Smooth R&B
+      { bpm:90, bars:16, beatsPerBar:4, barsPerChord:2,
+        chords:[[Eb4,G4,Bb4,D5],[Ab4,C5,Eb4],[Bb3,D4,F4,Ab4],[Eb4,G4,Bb4]],
+        bassNotes:[n(-18),n(-21),n(-13),n(-18)], bassBeats:[0,2], bassDecay:3, bassVol:0.10,
+        padVol:0.045, padDetune:true, rhythmPattern:[1,3], hihat:2, kickBeats:[0,2] },
+      // 11: Country Swing
+      { bpm:115, bars:16, beatsPerBar:4, barsPerChord:2,
+        chords:[[G3,B3,D4],[C4,E4,G4],[D4,Gb4,A4],[G3,B3,D4]],
+        bassNotes:[G3,C3,D3,G3], bassBeats:[0,2], bassDecay:5, bassVol:0.12,
+        padVol:0.03, rhythmPattern:[0.5,1.5,2.5,3.5], hihat:2, kickBeats:[0,2],
+        melody:[D5,0,B4,0,G4,0,A4,B4,C5,0,D5,0,B4,0,A4,0] },
+      // 12: Film Noir
+      { bpm:78, bars:16, beatsPerBar:4, barsPerChord:4,
+        chords:[[C4,Eb4,Gb4,Bb4],[F4,A4,C5,E5],[Bb3,D4,F4,Ab4],[Eb4,G4,Bb4]],
+        bassNotes:[C3,F3,Bb3,n(-18)], bassBeats:[0], bassDecay:2, bassVol:0.09,
+        padVol:0.05, padDetune:true, kickBeats:[0,2],
+        melody:[Gb4,0,0,0,F4,0,Eb4,0,0,0,0,0,D4,0,0,0] },
+      // 13: Afrobeat
+      { bpm:125, bars:16, beatsPerBar:4, barsPerChord:2,
+        chords:[[E4,G4,B4],[A3,C4,E4],[D4,F4,A4],[G3,B3,D4]],
+        bassNotes:[E3,A3,D3,G3], bassBeats:[0,0.75,1.5,2,3], bassDecay:6, bassVol:0.12,
+        padVol:0.03, rhythmPattern:[0.5,1,1.5,2.5,3,3.5], hihat:4, kickBeats:[0,1.5,2.5] },
+      // 14: Chill Hip-Hop
+      { bpm:88, bars:16, beatsPerBar:4, barsPerChord:4,
+        chords:[[A3,C4,E4,G4],[D4,F4,A4,C5],[E4,G4,B4,D5],[A3,C4,E4]],
+        bassNotes:[A3,D3,E3,A3], bassBeats:[0,2.5], bassDecay:3, bassVol:0.11,
+        padVol:0.045, padDetune:true, hihat:2, kickBeats:[0,1.75,2],
+        melody:[0,0,E5,0,C5,0,A4,0,0,0,G4,0,A4,0,0,0] },
+      // 15: Tango
+      { bpm:66, bars:16, beatsPerBar:4, barsPerChord:2,
+        chords:[[A3,C4,E4],[D4,F4,A4],[E4,Ab4,B4],[A3,C4,E4]],
+        bassNotes:[A3,D3,E3,A3], bassBeats:[0,2], bassDecay:4, bassVol:0.13,
+        padVol:0.04, rhythmPattern:[0,1,2,2.5,3,3.5], hihat:0, kickBeats:[0,2] },
+      // 16: Celtic Folk
+      { bpm:132, bars:16, beatsPerBar:4, barsPerChord:2,
+        chords:[[D4,F4,A4],[G3,B3,D4],[A3,C4,E4],[D4,F4,A4]],
+        bassNotes:[D3,G3,A3,D3], bassBeats:[0,2], bassDecay:5, bassVol:0.11,
+        padVol:0.03, hihat:4, kickBeats:[0,2],
+        melody:[A5,0,G5,F5,E5,0,D5,0,C5,0,D5,E5,F5,0,G5,0] },
+      // 17: Surf Rock
+      { bpm:140, bars:16, beatsPerBar:4, barsPerChord:2,
+        chords:[[E4,Ab4,B4],[A3,C4,E4],[B3,D4,Gb4],[E4,Ab4,B4]],
+        bassNotes:[E3,A3,B3,E3], bassBeats:[0,1,2,3], bassDecay:7, bassVol:0.11,
+        padVol:0.03, rhythmPattern:[0.5,1.5,2.5,3.5], hihat:4, kickBeats:[0,2],
+        melody:[B4,0,E5,0,Ab4,0,B4,0,A4,0,E4,0,Ab4,0,A4,0] },
+      // 18: Swing Jazz
+      { bpm:138, bars:16, beatsPerBar:4, barsPerChord:2,
+        chords:[[C4,E4,G4,Bb4],[F4,A4,C5,Eb4],[G4,B4,D5,F4],[C4,E4,G4,Bb4]],
+        bassNotes:[C3,F3,G3,C3], bassBeats:[0,2], bassDecay:4, bassVol:0.12,
+        padVol:0.035, rhythmPattern:[1.33,2.67,3.67], hihat:3, kickBeats:[0,2],
+        melody:[G5,0,E5,0,C5,0,Bb4,0,A4,0,G4,0,0,0,B4,0] },
+      // 19: Zen Meditation
+      { bpm:60, bars:16, beatsPerBar:4, barsPerChord:4,
+        chords:[[C4,G4,C5],[F4,C5,F5],[G4,D5,G5],[C4,G4,C5]],
+        bassNotes:[C3,F3,G3,C3], bassBeats:[0], bassDecay:1.5, bassVol:0.07,
+        padVol:0.06, padDetune:true, hihat:0, kickBeats:[],
+        melody:[G5,0,0,0,0,0,E5,0,0,0,0,0,C5,0,0,0] },
+    ];
+
+    return tracks;
+  }
+
   stopMusic() {
-    this.music?.stop();
+    if (this.music) {
+      this.music.stop();
+      this.music.unload();
+      this.music = null;
+    }
   }
 
   updateMusicVolume(volume: number) {

@@ -3,7 +3,21 @@ import { gsap } from 'gsap';
 import { useConnectionStore } from '../stores/connectionStore';
 import { socket } from '../socket/client';
 
-const BOT_NAMES = ['Robo Rex', 'Bot Betty', 'Chip', 'Sparky', 'Gizmo', 'Bolt', 'Pixel', 'Blip'];
+const BOT_NAMES = [
+  'Anna', 'Ben', 'Clara', 'David', 'Elena', 'Felix', 'Greta', 'Hans',
+  'Ida', 'Jan', 'Katrin', 'Leon', 'Marie', 'Nico', 'Olga', 'Paul',
+  'Rita', 'Stefan', 'Tina', 'Uwe', 'Vera', 'Werner', 'Xenia', 'Yusuf',
+  'Zara', 'Anton', 'Birgit', 'Claus', 'Doris', 'Emil', 'Frieda', 'Georg',
+  'Hanna', 'Ingo', 'Julia', 'Karl', 'Lena', 'Max', 'Nina', 'Otto',
+  'Petra', 'Ralf', 'Sabine', 'Thomas', 'Ursula', 'Volker', 'Waltraud', 'Xaver',
+  'Yvonne', 'Zelda', 'Anke', 'Boris', 'Carina', 'Dirk', 'Eva', 'Frank',
+  'Gabi', 'Helmut', 'Irene', 'Jens', 'Kerstin', 'Lukas', 'Mona', 'Norbert',
+  'Olivia', 'Peter', 'Rosa', 'Sven', 'Tanja', 'Ulf', 'Veronika', 'Wilhelm',
+  'Lars', 'Monika', 'Bernd', 'Heike', 'Dieter', 'Renate', 'Horst', 'Silke',
+  'Manfred', 'Elke', 'Rainer', 'Dagmar', 'Gerhard', 'Ingrid', 'Lothar', 'Beate',
+  'Erwin', 'Christa', 'Detlef', 'Gudrun', 'Hartmut', 'Margot', 'Jochen', 'Liesel',
+  'Konrad', 'Elfriede', 'Bruno', 'Hildegard',
+];
 
 export default function LobbyScreen() {
   const roomCode = useConnectionStore((s) => s.roomCode);
@@ -38,7 +52,10 @@ export default function LobbyScreen() {
 
   const handleAddBot = () => {
     const usedNames = lobby.filter((p) => p.isBot).map((p) => p.nickname);
-    const name = BOT_NAMES.find((n) => !usedNames.includes(n)) || `Bot ${lobby.length}`;
+    const available = BOT_NAMES.filter((n) => !usedNames.includes(n));
+    const name = available.length > 0
+      ? available[Math.floor(Math.random() * available.length)]
+      : `Bot ${lobby.length}`;
     socket.emit('add-bot', { nickname: name });
   };
 

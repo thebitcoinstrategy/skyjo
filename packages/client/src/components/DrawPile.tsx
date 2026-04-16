@@ -122,10 +122,10 @@ export default function DrawPile({ count, active, onClick, revealedCard }: DrawP
         {revealedCard && (
           <div
             ref={revealRef}
-            className="absolute inset-0 flex flex-col items-center pointer-events-none"
+            className="absolute inset-0 flex items-center justify-center pointer-events-none"
             style={{ zIndex: layers + 10 }}
           >
-            <div className={`w-[3.2rem] h-[4.2rem] rounded-md overflow-hidden shadow-2xl ring-2 ring-gold/70 relative`}>
+            <div className="w-[3.2rem] h-[4.2rem] rounded-md overflow-hidden shadow-2xl ring-2 ring-gold/70 relative">
               <div className={`absolute inset-0 bg-gradient-to-br ${getCardBg(revealedCard.value)}`} />
               <div className="absolute inset-[1px] rounded-sm border border-white/25" />
               <div className="absolute inset-0 flex items-center justify-center">
@@ -137,11 +137,6 @@ export default function DrawPile({ count, active, onClick, revealedCard }: DrawP
                 className="absolute inset-x-0 top-0 bg-gradient-to-b from-white/25 to-transparent pointer-events-none"
                 style={{ height: '35%' }}
               />
-            </div>
-            {/* Player name badge */}
-            <div className="mt-1 flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-sm border border-white/10">
-              <span className="text-xs">{revealedCard.avatar}</span>
-              <span className="text-white/80 text-[9px] font-semibold">{revealedCard.nickname}</span>
             </div>
           </div>
         )}

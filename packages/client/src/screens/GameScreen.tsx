@@ -136,7 +136,7 @@ export default function GameScreen() {
               nickname: drawer.nickname,
               avatar: drawer.avatar,
             });
-            await new Promise((r) => setTimeout(r, 1200));
+            await new Promise((r) => setTimeout(r, 2000));
             setRevealedCard(null);
           } else {
             await new Promise((r) => setTimeout(r, 200));
