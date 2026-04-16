@@ -1,19 +1,36 @@
 import Card from '../Card/Card';
 import type { VisibleCardSlot } from '@skyjo/shared';
+import { ROWS } from '@skyjo/shared';
 
 interface PlayerHandProps {
   cards: VisibleCardSlot[];
   small?: boolean;
+  tiny?: boolean;
   onCardClick?: (cardIndex: number) => void;
   interactive?: boolean;
   isDealing?: boolean;
+  highlightAll?: boolean;
+  dropTarget?: number | null;
+  onTouchStartCard?: (cardIndex: number) => (e: React.TouchEvent) => void;
+  skipFlipForIndex?: number | null;
 }
 
-export default function PlayerHand({ cards, small, onCardClick, interactive, isDealing }: PlayerHandProps) {
+export default function PlayerHand({
+  cards,
+  small,
+  tiny,
+  onCardClick,
+  interactive,
+  isDealing,
+  highlightAll,
+  dropTarget,
+  onTouchStartCard,
+  skipFlipForIndex,
+}: PlayerHandProps) {
   const totalCards = cards.length;
-  const rows = 4;
+  const rows = ROWS;
   const cols = Math.ceil(totalCards / rows);
-  const gap = small ? 'gap-0.5' : 'gap-1.5';
+  const gap = tiny ? 'gap-px' : small ? 'gap-0.5' : 'gap-1';
 
   return (
     <div
@@ -31,15 +48,24 @@ export default function PlayerHand({ cards, small, onCardClick, interactive, isD
           const card = cards[cardIdx];
           const dealIndex = col * rows + row;
           return (
-            <Card
+            <div
               key={`${col}-${row}`}
-              value={card.value}
-              faceUp={card.faceUp}
-              small={small}
-              onClick={onCardClick ? () => onCardClick(cardIdx) : undefined}
-              interactive={interactive ?? false}
-              dealDelay={isDealing ? dealIndex * 0.06 : undefined}
-            />
+              data-card-index={cardIdx}
+              onTouchStart={onTouchStartCard ? onTouchStartCard(cardIdx) : undefined}
+            >
+              <Card
+                value={card.value}
+                faceUp={card.faceUp}
+                small={small}
+                tiny={tiny}
+                onClick={onCardClick ? () => onCardClick(cardIdx) : undefined}
+                interactive={interactive ?? false}
+                highlight={highlightAll && !small && !tiny}
+                dealDelay={isDealing ? dealIndex * 0.06 : undefined}
+                dropTarget={dropTarget === cardIdx}
+                skipFlipAnimation={skipFlipForIndex === cardIdx}
+              />
+            </div>
           );
         })
       )}

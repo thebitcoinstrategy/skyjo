@@ -221,7 +221,10 @@ export class Bot {
 
   private static decideRandom(state: GameState, player: PlayerState): BotAction[] {
     if (state.turnPhase === 'draw') {
-      return Math.random() > 0.5 ? [{ type: 'draw-from-pile' }] : [{ type: 'draw-from-discard' }];
+      if (Math.random() > 0.5 && state.discardPile.length > 0) {
+        return [{ type: 'draw-from-discard' }];
+      }
+      return [{ type: 'draw-from-pile' }];
     }
 
     if (state.turnPhase === 'place_or_discard') {
@@ -308,7 +311,7 @@ export class Bot {
       const faceUpMatching = colCards.filter((c) => c.faceUp && c.value === value).length;
 
       // If 2 of 4 (for 4-row) match, placing this value could set up or complete elimination
-      if (faceUpMatching >= ROWS - 2) {
+      if (faceUpMatching >= ROWS - 1) {
         // Check if there's at least one slot to place it
         const hasTarget = colCards.some((c) => !c.faceUp || c.value !== value);
         if (hasTarget) return col;

@@ -15,7 +15,7 @@ export default function AudioControls() {
             ? 'bg-white/10 text-white/70 hover:bg-white/20'
             : 'bg-white/5 text-white/20 hover:bg-white/10'
         }`}
-        title={musicEnabled ? 'Mute music' : 'Enable music'}
+        title={musicEnabled ? 'Musik aus' : 'Musik an'}
       >
         {musicEnabled ? '🎵' : '🔇'}
       </button>
@@ -26,7 +26,7 @@ export default function AudioControls() {
             ? 'bg-white/10 text-white/70 hover:bg-white/20'
             : 'bg-white/5 text-white/20 hover:bg-white/10'
         }`}
-        title={sfxEnabled ? 'Mute SFX' : 'Enable SFX'}
+        title={sfxEnabled ? 'Effekte aus' : 'Effekte an'}
       >
         {sfxEnabled ? '🔊' : '🔈'}
       </button>

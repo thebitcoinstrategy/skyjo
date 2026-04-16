@@ -34,7 +34,7 @@ function saveSetting(key: string, value: unknown): void {
 export const useSettingsStore = create<SettingsState>((set) => ({
   musicVolume: loadSetting('musicVolume', 0.5),
   sfxVolume: loadSetting('sfxVolume', 0.7),
-  musicEnabled: loadSetting('musicEnabled', true),
+  musicEnabled: loadSetting('musicEnabled', false),
   sfxEnabled: loadSetting('sfxEnabled', true),
   reduceAnimations: loadSetting('reduceAnimations', false),
 

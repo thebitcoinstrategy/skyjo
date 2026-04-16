@@ -52,7 +52,9 @@ export default function ResultsScreen() {
   return (
     <div className="h-full flex flex-col items-center p-6 relative overflow-hidden">
       <Confetti active={isWinner || (isGameOver && sortedPlayers[0]?.id === playerId)} />
-      <div className="absolute inset-0 bg-gradient-to-b from-[#0c331a] via-felt to-[#0c331a]" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[#1b0f0a] via-felt to-[#1b0f0a]" />
+      <div className="absolute inset-0 felt-texture" />
+      <div className="absolute inset-0 felt-noise" />
 
       <div className="relative z-10 w-full max-w-xs flex flex-col h-full">
         {/* Title */}
@@ -60,17 +62,17 @@ export default function ResultsScreen() {
           <h2 ref={titleRef} className="text-3xl font-black">
             {isGameOver ? (
               isWinner ? (
-                <span className="text-gold drop-shadow-[0_2px_10px_rgba(255,215,0,0.3)]">You Win!</span>
+                <span className="text-gold drop-shadow-[0_2px_10px_rgba(255,215,0,0.3)]">Du gewinnst!</span>
               ) : (
-                <span className="text-white/80">Game Over</span>
+                <span className="text-white/80">Spiel vorbei</span>
               )
             ) : (
-              <span className="text-gold">Round {gameState.roundNumber}</span>
+              <span className="text-gold">Runde {gameState.roundNumber}</span>
             )}
           </h2>
           {isGameOver && !isWinner && (
             <p className="text-white/40 text-sm mt-1">
-              {sortedPlayers[0]?.avatar} {sortedPlayers[0]?.nickname} wins!
+              {sortedPlayers[0]?.avatar} {sortedPlayers[0]?.nickname} gewinnt!
             </p>
           )}
         </div>
@@ -122,7 +124,7 @@ export default function ResultsScreen() {
         {/* Round History */}
         {sortedPlayers[0]?.roundScores.length > 1 && (
           <div className="mt-4 p-3 rounded-xl bg-white/4 border border-white/5">
-            <p className="text-white/30 text-[10px] uppercase tracking-[0.3em] mb-2">Round History</p>
+            <p className="text-white/30 text-[10px] uppercase tracking-[0.3em] mb-2">Rundenverlauf</p>
             <div className="space-y-1.5">
               {sortedPlayers.map((player) => (
                 <div key={player.id} className="flex items-center gap-2 text-xs">
@@ -154,16 +156,16 @@ export default function ResultsScreen() {
           {isHost && (
             <button
               onClick={handlePlayAgain}
-              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-gold to-yellow-500 text-felt-dark font-bold text-lg shadow-lg shadow-gold/20 active:scale-[0.97] transition-all"
+              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-gold to-gold-dark text-felt-dark font-bold text-lg shadow-lg shadow-gold/20 active:scale-[0.97] transition-all"
             >
-              {isGameOver ? 'New Game' : 'Next Round'}
+              {isGameOver ? 'Neues Spiel' : 'Naechste Runde'}
             </button>
           )}
           <button
             onClick={handleLeave}
             className="w-full py-2 text-white/20 text-sm hover:text-white/50 transition-colors"
           >
-            Leave
+            Verlassen
           </button>
         </div>
       </div>

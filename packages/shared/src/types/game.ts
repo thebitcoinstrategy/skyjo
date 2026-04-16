@@ -30,7 +30,7 @@ export interface PlayerState {
   id: string;
   nickname: string;
   avatar: string;
-  cards: CardSlot[];        // 12 cards in column-major order: [col0row0, col0row1, col0row2, col0row3, col1row0, ...]
+  cards: CardSlot[];        // 12 cards in column-major order: [col0row0, col0row1, col0row2, col1row0, col1row1, ...]
   score: number;
   roundScores: number[];
   connected: boolean;
@@ -78,16 +78,16 @@ export interface VisibleGameState {
   finalRoundTurnsLeft: number;
 }
 
-export const ROWS = 4;
-export const COLS = 3;
+export const ROWS = 3;
+export const COLS = 4;
 export const CARDS_PER_PLAYER = ROWS * COLS; // 12
 
-/** Get column index (0-2) for a card at given index */
+/** Get column index (0-3) for a card at given index */
 export function getCol(cardIndex: number): number {
   return Math.floor(cardIndex / ROWS);
 }
 
-/** Get row index (0-3) for a card at given index */
+/** Get row index (0-2) for a card at given index */
 export function getRow(cardIndex: number): number {
   return cardIndex % ROWS;
 }

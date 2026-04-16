@@ -1,19 +1,21 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   plugins: [
+    tailwindcss(),
     react(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'sounds/**/*'],
       manifest: {
-        name: 'Skyjo',
-        short_name: 'Skyjo',
-        description: 'Play Skyjo card game with friends!',
-        theme_color: '#1a5c2e',
-        background_color: '#0f3d1e',
+        name: 'Kuschnik SkyJo',
+        short_name: 'SkyJo',
+        description: 'Spiele SkyJo mit Freunden und Familie!',
+        theme_color: '#1b0f0a',
+        background_color: '#1b0f0a',
         display: 'standalone',
         orientation: 'portrait',
         icons: [

@@ -17,6 +17,11 @@ import { Bot } from './Bot.js';
 import { BotDifficulty } from './BotDifficulty.js';
 import { generateRoomCode } from '../utils/roomCodes.js';
 
+function log(room: string, ...args: unknown[]) {
+  const ts = new Date().toISOString().slice(11, 23);
+  console.log(`[${ts}] [${room}]`, ...args);
+}
+
 interface RoomPlayer {
   id: string;
   socketId: string;
@@ -153,9 +158,14 @@ export class RoomManager {
 
     room.engine = new GameEngine(playerInfos);
     room.engine.startRound();
+    log(room.code, `Game started! ${room.players.length} players: ${room.players.map(p => `${p.nickname}${p.isBot ? '(bot)' : ''}`).join(', ')}`);
 
-    // Send personalized game state to each player
-    this.broadcastGameState(io, room);
+    // Send personalized initial game state to each player via game-started
+    for (const player of room.players) {
+      if (player.isBot) continue;
+      const visibleState = room.engine.getVisibleState(player.id);
+      io.to(player.socketId).emit('game-started', visibleState);
+    }
   }
 
   flipInitialCard(
@@ -181,8 +191,13 @@ export class RoomManager {
 
     this.broadcastGameState(io, room);
 
-    // If bots need to flip, do so
+    // If bots still need to flip, do so
     if (room.engine.state.phase === 'flipping_initial') {
+      this.processBotTurns(io, room);
+    }
+
+    // If initial flips just completed and game started, kick off bot turns
+    if (room.engine.state.phase === 'playing' || room.engine.state.phase === 'final_round') {
       this.processBotTurns(io, room);
     }
   }
@@ -196,14 +211,16 @@ export class RoomManager {
 
     const result = room.engine.drawFromPile(socket.id);
     if (!result.ok) {
+      log(room.code, `Human drawFromPile FAILED: ${result.error}`);
       socket.emit('error', { message: result.error });
       return;
     }
+    log(room.code, `Human drawFromPile OK. drawnCard=${room.engine.state.drawnCard}`);
 
     io.to(room.code).emit('animation-event', {
       type: 'draw-from-pile',
       playerId: socket.id,
-      data: {},
+      data: { value: room.engine.state.drawnCard },
     });
 
     this.broadcastGameState(io, room);
@@ -218,14 +235,16 @@ export class RoomManager {
 
     const result = room.engine.drawFromDiscard(socket.id);
     if (!result.ok) {
+      log(room.code, `Human drawFromDiscard FAILED: ${result.error}`);
       socket.emit('error', { message: result.error });
       return;
     }
+    log(room.code, `Human drawFromDiscard OK. drawnCard=${room.engine.state.drawnCard}`);
 
     io.to(room.code).emit('animation-event', {
       type: 'draw-from-discard',
       playerId: socket.id,
-      data: {},
+      data: { value: room.engine.state.drawnCard },
     });
 
     this.broadcastGameState(io, room);
@@ -241,9 +260,11 @@ export class RoomManager {
 
     const result = room.engine.placeDrawnCard(socket.id, payload.cardIndex);
     if (!result.ok) {
+      log(room.code, `Human placeDrawnCard FAILED: ${result.error}`);
       socket.emit('error', { message: result.error });
       return;
     }
+    log(room.code, `Human placeDrawnCard OK. cardIndex=${payload.cardIndex} colElim=${result.columnEliminated} phase=${room.engine.state.phase} turnPhase=${room.engine.state.turnPhase} currentIdx=${room.engine.state.currentPlayerIndex}`);
 
     io.to(room.code).emit('animation-event', {
       type: 'place-card',
@@ -273,9 +294,11 @@ export class RoomManager {
 
     const result = room.engine.discardDrawnCard(socket.id);
     if (!result.ok) {
+      log(room.code, `Human discardDrawnCard FAILED: ${result.error}`);
       socket.emit('error', { message: result.error });
       return;
     }
+    log(room.code, `Human discardDrawnCard OK. phase=${room.engine.state.phase} turnPhase=${room.engine.state.turnPhase}`);
 
     io.to(room.code).emit('animation-event', {
       type: 'discard-card',
@@ -296,9 +319,11 @@ export class RoomManager {
 
     const result = room.engine.flipCard(socket.id, payload.cardIndex);
     if (!result.ok) {
+      log(room.code, `Human flipCard FAILED: ${result.error}`);
       socket.emit('error', { message: result.error });
       return;
     }
+    log(room.code, `Human flipCard OK. cardIndex=${payload.cardIndex} colElim=${result.columnEliminated} phase=${room.engine.state.phase} turnPhase=${room.engine.state.turnPhase} currentIdx=${room.engine.state.currentPlayerIndex}`);
 
     io.to(room.code).emit('animation-event', {
       type: 'flip-card',
@@ -481,6 +506,7 @@ export class RoomManager {
     if (!room.engine) return;
 
     if (room.engine.state.phase === 'round_over') {
+      log(room.code, `Round over! Computing scores.`);
       const scores = room.engine.getRoundScores();
       io.to(room.code).emit('round-ended', scores);
 
@@ -521,6 +547,7 @@ export class RoomManager {
         const delay = 800 + Math.random() * 1200; // 800-2000ms
 
         setTimeout(() => {
+          if (!room.engine) return;
           while (player.initialFlipsRemaining > 0) {
             const cardIndex = Bot.decideInitialFlip(player, tier);
             if (cardIndex < 0) break;
@@ -550,19 +577,33 @@ export class RoomManager {
     if (state.phase !== 'playing' && state.phase !== 'final_round') return;
 
     const currentPlayer = state.players[state.currentPlayerIndex];
-    if (!currentPlayer.isBot) return;
+    if (!currentPlayer.isBot) {
+      log(room.code, `Turn: ${currentPlayer.nickname} (human) — waiting for input. phase=${state.phase} turnPhase=${state.turnPhase}`);
+      return;
+    }
 
     const tier = room.botDifficulty.getTier();
     const mistakeRate = room.botDifficulty.getMistakeRate();
 
+    log(room.code, `Bot turn: ${currentPlayer.nickname} (idx=${state.currentPlayerIndex}) phase=${state.phase} turnPhase=${state.turnPhase} tier=${tier}`);
+
     const executeBotActions = () => {
       const actions = Bot.decide(state, currentPlayer.id, tier, mistakeRate);
+      log(room.code, `Bot ${currentPlayer.nickname} decides: ${JSON.stringify(actions.map(a => a.type))}`);
+
+      // Chain actions sequentially with cumulative delays
+      let cumulativeDelay = 0;
 
       for (const action of actions) {
         const actionDelay = 600 + Math.random() * 800;
+        cumulativeDelay += actionDelay;
 
         setTimeout(() => {
+          // Guard: room/engine may have been cleaned up during the delay
+          if (!room.engine) return;
+
           let result;
+          log(room.code, `Bot ${currentPlayer.nickname} exec: ${action.type}${action.cardIndex !== undefined ? ` cardIndex=${action.cardIndex}` : ''} phase=${engine.state.phase} turnPhase=${engine.state.turnPhase}`);
 
           switch (action.type) {
             case 'draw-from-pile':
@@ -571,7 +612,7 @@ export class RoomManager {
                 io.to(room.code).emit('animation-event', {
                   type: 'draw-from-pile',
                   playerId: currentPlayer.id,
-                  data: {},
+                  data: { value: engine.state.drawnCard },
                 });
               }
               break;
@@ -582,7 +623,7 @@ export class RoomManager {
                 io.to(room.code).emit('animation-event', {
                   type: 'draw-from-discard',
                   playerId: currentPlayer.id,
-                  data: {},
+                  data: { value: engine.state.drawnCard },
                 });
               }
               break;
@@ -635,22 +676,36 @@ export class RoomManager {
               break;
           }
 
+          if (!result || !result.ok) {
+            log(room.code, `!! Bot ${currentPlayer.nickname} action FAILED: ${action.type} -> ${result?.error ?? 'no result'}`);
+          } else {
+            log(room.code, `Bot ${currentPlayer.nickname} action OK: ${action.type} -> phase=${engine.state.phase} turnPhase=${engine.state.turnPhase} currentIdx=${engine.state.currentPlayerIndex}`);
+          }
+
           this.broadcastGameState(io, room);
-        }, actionDelay);
+        }, cumulativeDelay);
       }
 
-      // After all bot actions, check for next bot turn or round end
-      const totalDelay = actions.length * 1400 + 500;
+      // After all bot actions complete, check for next bot turn or round end
       setTimeout(() => {
+        if (!room.engine) return;
+        log(room.code, `Bot ${currentPlayer.nickname} actions done. phase=${engine.state.phase} turnPhase=${engine.state.turnPhase} currentIdx=${engine.state.currentPlayerIndex}`);
         this.checkRoundEnd(io, room);
         // If next player is also a bot, process their turn too
         if (state.phase === 'playing' || state.phase === 'final_round') {
           const nextPlayer = state.players[state.currentPlayerIndex];
           if (nextPlayer?.isBot) {
+            log(room.code, `Next bot: ${nextPlayer.nickname} (idx=${state.currentPlayerIndex})`);
             this.processBotTurns(io, room);
+          } else if (nextPlayer) {
+            log(room.code, `Next player: ${nextPlayer.nickname} (human, idx=${state.currentPlayerIndex})`);
+          } else {
+            log(room.code, `!! No next player at idx=${state.currentPlayerIndex}, players=${state.players.length}`);
           }
+        } else {
+          log(room.code, `Game not in play phase: ${state.phase}`);
         }
-      }, totalDelay);
+      }, cumulativeDelay + 500);
     };
 
     // Initial delay before bot starts its turn

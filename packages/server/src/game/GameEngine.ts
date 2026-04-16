@@ -7,6 +7,7 @@ import {
   type CardValue,
   type CardSlot,
   type RoundEndPayload,
+  ROWS,
   CARDS_PER_PLAYER,
   INITIAL_FLIPS,
   END_SCORE,
@@ -396,8 +397,8 @@ export class GameEngine {
     if (colIdx >= 0) {
       // Move eliminated cards to discard
       const colCards: CardValue[] = [];
-      const startIdx = colIdx * 4;
-      for (let r = 0; r < 4; r++) {
+      const startIdx = colIdx * ROWS;
+      for (let r = 0; r < ROWS; r++) {
         colCards.push(player.cards[startIdx + r].value);
       }
       this.state.discardPile.push(...colCards);

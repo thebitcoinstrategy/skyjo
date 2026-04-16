@@ -35,20 +35,27 @@ export default function TurnIndicator({ text, isMyTurn, isFinalRound, turnsLeft 
   }, [isMyTurn]);
 
   return (
-    <div ref={ref} className="flex items-center justify-center gap-2 py-1.5">
+    <div
+      ref={ref}
+      className={`flex items-center justify-center gap-1.5 py-1 mx-3 rounded-lg transition-colors duration-300 ${
+        isMyTurn
+          ? 'bg-gold/10 border border-gold/20'
+          : 'bg-transparent border border-transparent'
+      }`}
+    >
       {isMyTurn && (
-        <span ref={dotRef} className="w-2 h-2 rounded-full bg-gold inline-block" />
+        <span ref={dotRef} className="w-2.5 h-2.5 rounded-full bg-gold inline-block shadow-sm shadow-gold/50" />
       )}
       <span
-        className={`text-sm font-semibold tracking-wide ${
+        className={`text-xs font-bold tracking-wide ${
           isMyTurn ? 'text-gold' : 'text-white/40'
         }`}
       >
         {text}
       </span>
       {isFinalRound && (
-        <span className="ml-1 px-2 py-0.5 bg-orange-500/20 border border-orange-500/30 rounded-full text-orange-400 text-[10px] font-bold animate-pulse">
-          FINAL {turnsLeft} left
+        <span className="ml-1 px-2.5 py-0.5 bg-orange-500/20 border border-orange-500/30 rounded-full text-orange-400 text-[10px] font-bold animate-pulse">
+          FINALE noch {turnsLeft}
         </span>
       )}
     </div>

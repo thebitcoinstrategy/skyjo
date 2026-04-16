@@ -1,16 +1,24 @@
 import { useState, useRef, useEffect } from 'react';
 import { gsap } from 'gsap';
 import { socket } from '../socket/client';
-import { useSocket } from '../hooks/useSocket';
 import { useConnectionStore } from '../stores/connectionStore';
+import BackgroundArt from '../components/BackgroundArt';
+import { APP_VERSION } from '../version';
 
 const AVATARS = ['😎', '🦊', '🐸', '🦁', '🐼', '🐱', '🐶', '🦄', '🐙', '🎯', '⭐', '🔥', '💎', '🎲', '🃏', '🌟'];
 
 export default function HomeScreen() {
-  useSocket();
 
-  const [nickname, setNickname] = useState('');
-  const [avatar, setAvatar] = useState(AVATARS[0]);
+  const [nickname, setNickname] = useState(() => {
+    try { return localStorage.getItem('skyjo_nickname') ?? ''; } catch { return ''; }
+  });
+  const [avatar, setAvatar] = useState(() => {
+    try {
+      const saved = localStorage.getItem('skyjo_avatar');
+      if (saved && AVATARS.includes(saved)) return saved;
+    } catch { /* ignore */ }
+    return AVATARS[Math.floor(Math.random() * AVATARS.length)];
+  });
   const [roomCode, setRoomCode] = useState('');
   const [mode, setMode] = useState<'menu' | 'join'>('menu');
   const error = useConnectionStore((s) => s.error);
@@ -38,13 +46,22 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const saveProfile = () => {
+    try {
+      localStorage.setItem('skyjo_nickname', nickname.trim());
+      localStorage.setItem('skyjo_avatar', avatar);
+    } catch { /* ignore */ }
+  };
+
   const handleCreate = () => {
     if (!canSubmit) return;
+    saveProfile();
     socket.emit('create-room', { nickname: nickname.trim(), avatar });
   };
 
   const handleJoin = () => {
     if (!canSubmit || roomCode.trim().length < 4) return;
+    saveProfile();
     socket.emit('join-room', {
       roomCode: roomCode.trim().toUpperCase(),
       nickname: nickname.trim(),
@@ -54,6 +71,7 @@ export default function HomeScreen() {
 
   const handleSinglePlayer = () => {
     if (!canSubmit) return;
+    saveProfile();
     socket.emit('create-room', { nickname: nickname.trim(), avatar });
   };
 
@@ -65,24 +83,36 @@ export default function HomeScreen() {
   return (
     <div className="h-full flex flex-col items-center justify-center p-6 relative overflow-hidden">
       {/* Background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[#0c331a] via-felt to-[#0c331a]" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[#1b0f0a] via-felt to-[#1b0f0a]" />
+      <div className="absolute inset-0 felt-texture" />
+      <div className="absolute inset-0 felt-noise" />
       <div
-        className="absolute inset-0 opacity-[0.02]"
-        style={{
-          backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)',
-          backgroundSize: '20px 20px',
-        }}
+        className="absolute inset-0 pointer-events-none"
+        style={{ background: 'radial-gradient(ellipse at 50% 40%, transparent 30%, rgba(0,0,0,0.35) 100%)' }}
       />
+      <BackgroundArt variant="home" />
+
+      {/* Version number */}
+      <div className="absolute bottom-2 right-3 z-10 text-white/15 text-[10px] font-mono">
+        v{APP_VERSION}
+      </div>
 
       <div className="relative z-10 w-full max-w-xs flex flex-col items-center">
         {/* Title */}
-        <div ref={titleRef} className="mb-8 text-center">
-          <h1 className="text-7xl font-black text-transparent bg-clip-text bg-gradient-to-b from-gold to-gold-dark tracking-tight" style={{ textShadow: 'none' }}>
-            <span className="text-gold drop-shadow-[0_2px_10px_rgba(255,215,0,0.3)]">SKYJO</span>
-          </h1>
-          <p className="text-white/30 text-xs mt-1 tracking-[0.3em] uppercase font-medium">
-            Card Game
+        <div ref={titleRef} className="mb-6 text-center">
+          <p className="text-gold text-2xl tracking-[0.3em] uppercase font-black mb-0 drop-shadow-[0_2px_8px_rgba(245,193,108,0.25)]">
+            Kuschnik
           </p>
+          <h1 className="text-7xl font-black tracking-tight title-shimmer drop-shadow-[0_2px_12px_rgba(245,193,108,0.4)] -mt-1">
+            SKYJO
+          </h1>
+          <div className="flex items-center justify-center gap-2 mt-1">
+            <span className="h-px w-8 bg-gradient-to-r from-transparent to-gold/40" />
+            <p className="text-white/40 text-[11px] tracking-[0.4em] uppercase font-medium">
+              Kartenspiel
+            </p>
+            <span className="h-px w-8 bg-gradient-to-l from-transparent to-gold/40" />
+          </div>
         </div>
 
         <div ref={formRef}>
@@ -93,7 +123,7 @@ export default function HomeScreen() {
                 <button
                   key={a}
                   onClick={(e) => handleAvatarClick(a, e.currentTarget)}
-                  className={`w-9 h-9 text-lg rounded-lg flex items-center justify-center transition-all duration-200 ${
+                  className={`w-10 h-10 text-xl rounded-xl flex items-center justify-center transition-all duration-200 ${
                     avatar === a
                       ? 'bg-gold/30 scale-110 shadow-lg shadow-gold/20 ring-2 ring-gold/50'
                       : 'bg-white/5 hover:bg-white/15 active:scale-90'
@@ -110,7 +140,7 @@ export default function HomeScreen() {
             type="text"
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
-            placeholder="Your name"
+            placeholder="Dein Name"
             maxLength={15}
             className="w-full px-4 py-3 rounded-xl bg-white/8 text-white text-center text-lg placeholder-white/30 border-2 border-white/10 focus:border-gold/60 focus:bg-white/12 focus:outline-none transition-all mb-5"
           />
@@ -126,23 +156,23 @@ export default function HomeScreen() {
               <button
                 onClick={handleCreate}
                 disabled={!canSubmit}
-                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-gold to-yellow-500 text-felt-dark font-bold text-lg shadow-lg shadow-gold/20 hover:shadow-gold/40 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none"
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-gold to-gold-dark text-felt-dark font-bold text-lg shadow-lg shadow-gold/20 hover:shadow-gold/40 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none"
               >
-                Create Game
+                Spiel erstellen
               </button>
               <button
                 onClick={() => setMode('join')}
                 disabled={!canSubmit}
                 className="w-full py-3 rounded-xl bg-white/8 text-white font-bold text-lg border border-white/15 hover:bg-white/15 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
               >
-                Join Game
+                Spiel beitreten
               </button>
               <button
                 onClick={handleSinglePlayer}
                 disabled={!canSubmit}
                 className="w-full py-3 rounded-xl bg-transparent text-white/50 font-medium border border-white/8 hover:text-white/80 hover:border-white/20 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
               >
-                Play vs Bots
+                Gegen Bots spielen
               </button>
             </div>
           ) : (
@@ -159,15 +189,15 @@ export default function HomeScreen() {
               <button
                 onClick={handleJoin}
                 disabled={!canSubmit || roomCode.trim().length < 4}
-                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-gold to-yellow-500 text-felt-dark font-bold text-lg shadow-lg shadow-gold/20 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none"
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-gold to-gold-dark text-felt-dark font-bold text-lg shadow-lg shadow-gold/20 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none"
               >
-                Join
+                Beitreten
               </button>
               <button
                 onClick={() => setMode('menu')}
                 className="w-full py-2 text-white/30 text-sm hover:text-white/60 transition-colors"
               >
-                Back
+                Zurueck
               </button>
             </div>
           )}

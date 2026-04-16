@@ -1,12 +1,10 @@
 import { io, Socket } from 'socket.io-client';
 import type { ClientEvents, ServerEvents } from '@skyjo/shared';
 
-const URL =
-  import.meta.env.PROD
-    ? window.location.origin
-    : 'http://localhost:3000';
-
-export const socket: Socket<ServerEvents, ClientEvents> = io(URL, {
+// Always connect through the same origin — in dev, Vite proxies
+// /socket.io to the game server. This ensures it works from any
+// device on the network, not just localhost.
+export const socket: Socket<ServerEvents, ClientEvents> = io({
   autoConnect: false,
   transports: ['websocket', 'polling'],
 });

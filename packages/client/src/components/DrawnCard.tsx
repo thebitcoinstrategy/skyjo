@@ -4,58 +4,60 @@ import type { CardValue } from '@skyjo/shared';
 
 interface DrawnCardProps {
   value: CardValue;
-  onDiscard?: () => void;
   canDiscard: boolean;
 }
 
-function getColor(value: number): string {
-  if (value <= -1) return 'text-blue-600';
-  if (value === 0) return 'text-yellow-600';
-  if (value <= 4) return 'text-green-600';
-  if (value <= 8) return 'text-orange-500';
-  return 'text-red-600';
+function getStyle(value: number): { bg: string; text: string; glow: string } {
+  if (value <= -2) return { bg: 'from-blue-500 to-blue-700', text: 'text-white', glow: 'shadow-blue-400/50' };
+  if (value === -1) return { bg: 'from-sky-400 to-sky-600', text: 'text-white', glow: 'shadow-sky-400/50' };
+  if (value === 0) return { bg: 'from-yellow-400 to-amber-500', text: 'text-white', glow: 'shadow-yellow-400/50' };
+  if (value <= 4) return { bg: 'from-emerald-400 to-emerald-600', text: 'text-white', glow: 'shadow-emerald-400/50' };
+  if (value <= 8) return { bg: 'from-orange-400 to-orange-600', text: 'text-white', glow: 'shadow-orange-400/50' };
+  return { bg: 'from-red-500 to-red-700', text: 'text-white', glow: 'shadow-red-400/50' };
 }
 
-export default function DrawnCard({ value, onDiscard, canDiscard }: DrawnCardProps) {
+export default function DrawnCard({ value, canDiscard }: DrawnCardProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!ref.current) return;
-    // Entrance animation
     gsap.fromTo(
       ref.current,
-      { y: -40, scale: 0.5, opacity: 0, rotateZ: -10 },
-      { y: 0, scale: 1, opacity: 1, rotateZ: 0, duration: 0.5, ease: 'back.out(1.7)' }
+      { y: 20, scale: 0.3, opacity: 0, rotateZ: -8 },
+      { y: 0, scale: 1, opacity: 1, rotateZ: 0, duration: 0.35, ease: 'back.out(1.7)' }
     );
   }, []);
 
-  // Gentle floating animation
-  useEffect(() => {
-    if (!ref.current) return;
-    gsap.to(ref.current, {
-      y: -3,
-      duration: 1.2,
-      repeat: -1,
-      yoyo: true,
-      ease: 'sine.inOut',
-    });
-    return () => { if (ref.current) gsap.killTweensOf(ref.current); };
-  }, []);
+  const style = getStyle(value);
 
   return (
     <div ref={ref} className="flex flex-col items-center gap-1">
-      <div className="w-16 h-24 rounded-xl bg-white border-2 border-gold flex items-center justify-center shadow-xl shadow-gold/30">
-        <span className={`text-2xl font-black ${getColor(value)} drop-shadow-sm`}>
-          {value}
-        </span>
+      <div
+        className={`w-[3.2rem] h-[4.2rem] rounded-md overflow-hidden shadow-2xl ${style.glow} ring-2 ring-gold/60 relative card-shine`}
+      >
+        <div className={`absolute inset-0 bg-gradient-to-br ${style.bg}`} />
+        <div className="absolute inset-[1px] rounded-sm border border-white/25" />
+        <span className="absolute top-0.5 left-1 text-[7px] font-bold text-white/70">{value}</span>
+        <span className="absolute bottom-0.5 right-1 text-[7px] font-bold text-white/70 rotate-180">{value}</span>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-[1px]">
+            <span
+              className={`text-lg font-black ${style.text} drop-shadow-md`}
+              style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
+            >
+              {value}
+            </span>
+          </div>
+        </div>
+        <div
+          className="absolute inset-x-0 top-0 bg-gradient-to-b from-white/25 to-transparent pointer-events-none"
+          style={{ height: '35%' }}
+        />
+        <div className="absolute inset-0 rounded-md shadow-[inset_0_0_8px_rgba(255,215,0,0.15)]" />
       </div>
-      {canDiscard && onDiscard && (
-        <button
-          onClick={onDiscard}
-          className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded-full text-xs text-white/60 hover:text-white/90 transition-all active:scale-90"
-        >
-          Discard
-        </button>
+
+      {canDiscard && (
+        <span className="text-[8px] text-white/30 font-medium">Ziehen zum Tauschen oder Ablegen</span>
       )}
     </div>
   );

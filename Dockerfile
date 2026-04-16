@@ -18,7 +18,7 @@ COPY packages/shared/ ./packages/shared/
 COPY packages/server/ ./packages/server/
 COPY packages/client/ ./packages/client/
 
-# Build all packages
+# Build all packages (shared -> server -> client)
 RUN npm run build
 
 # Stage 2: Production

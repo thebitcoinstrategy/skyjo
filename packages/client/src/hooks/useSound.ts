@@ -15,6 +15,8 @@ export function useSound() {
   const playerId = useConnectionStore((s) => s.playerId);
   const musicEnabled = useSettingsStore((s) => s.musicEnabled);
   const musicVolume = useSettingsStore((s) => s.musicVolume);
+  const sfxEnabled = useSettingsStore((s) => s.sfxEnabled);
+  const sfxVolume = useSettingsStore((s) => s.sfxVolume);
 
   // Initialize sound manager on first user interaction
   useEffect(() => {
@@ -54,7 +56,7 @@ export function useSound() {
             soundManager.play('draw');
             break;
           case 'place-card':
-            soundManager.play('card-place');
+            soundManager.play('card-drag');
             break;
           case 'discard-card':
             soundManager.play('card-place');
@@ -77,19 +79,40 @@ export function useSound() {
     return unsub;
   }, []);
 
-  // Play turn notification when it becomes our turn
+  // Play turn notification and announce player name via TTS
   useEffect(() => {
     if (!gameState || !playerId || !prevState.current) {
       prevState.current = gameState;
       return;
     }
 
+    const prevTurnIndex = prevState.current.currentPlayerIndex;
+    const currTurnIndex = gameState.currentPlayerIndex;
     const myIndex = gameState.players.findIndex((p) => p.id === playerId);
-    const wasMyTurn = prevState.current.currentPlayerIndex === myIndex;
-    const isMyTurn = gameState.currentPlayerIndex === myIndex;
+    const wasMyTurn = prevTurnIndex === myIndex;
+    const isMyTurn = currTurnIndex === myIndex;
 
-    if (!wasMyTurn && isMyTurn && gameState.phase !== 'flipping_initial') {
-      soundManager.play('turn-notify');
+    // Turn changed
+    if (prevTurnIndex !== currTurnIndex && gameState.phase !== 'flipping_initial') {
+      if (!wasMyTurn && isMyTurn) {
+        soundManager.play('turn-notify');
+      }
+
+      // TTS: announce whose turn it is
+      const currentPlayer = gameState.players[currTurnIndex];
+      if (currentPlayer && sfxEnabled) {
+        const name = currTurnIndex === myIndex ? 'Du' : currentPlayer.nickname;
+        try {
+          const utterance = new SpeechSynthesisUtterance(name);
+          utterance.rate = 1.1;
+          utterance.volume = Math.min(sfxVolume, 0.8);
+          utterance.pitch = 1.0;
+          speechSynthesis.cancel(); // Cancel any pending speech
+          speechSynthesis.speak(utterance);
+        } catch {
+          // TTS not available on this device
+        }
+      }
     }
 
     prevState.current = gameState;
