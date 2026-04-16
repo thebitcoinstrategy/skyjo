@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a5c2e"/>
+      <stop offset="100%" style="stop-color:#0f3d1e"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff"/>
+      <stop offset="100%" style="stop-color:#e8e8e8"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="38" fill="url(#bg)"/>
+  <!-- Card shape -->
+  <rect x="52" y="32" width="88" height="128" rx="12" fill="url(#card)" opacity="0.95"/>
+  <!-- S letter -->
+  <text x="96" y="115" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="72" fill="#1a5c2e">S</text>
+  <!-- Gold accent line -->
+  <rect x="62" y="140" width="68" height="4" rx="2" fill="#ffd700"/>
+</svg>
