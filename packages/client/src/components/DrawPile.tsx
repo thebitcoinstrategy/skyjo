@@ -55,9 +55,9 @@ export default function DrawPile({ count, active, onClick, revealedCard }: DrawP
   // Dynamic 3D stack: more cards = taller stack
   const maxCards = 150;
   const stackRatio = Math.min(count / maxCards, 1);
-  // Stack layers: 1-6 layers depending on how many cards remain
-  const layers = Math.max(1, Math.min(6, Math.ceil(stackRatio * 6)));
-  const layerOffset = 1.2; // px per layer
+  // Stack layers: 2-8 layers depending on how many cards remain
+  const layers = Math.max(2, Math.min(8, Math.ceil(stackRatio * 8)));
+  const layerOffset = 2.0; // px per layer (vertical)
 
   return (
     <div className="flex flex-col items-center gap-1">
@@ -79,17 +79,21 @@ export default function DrawPile({ count, active, onClick, revealedCard }: DrawP
           {/* 3D stack layers — rendered bottom to top */}
           {Array.from({ length: layers }, (_, i) => {
             const depth = layers - i;
-            const offsetX = depth * 1.0;
+            const offsetX = depth * 1.5;
             const offsetY = depth * layerOffset;
-            const darkness = 0.15 + depth * 0.08;
+            const brightness = Math.max(0.3, 0.85 - depth * 0.08);
             return (
               <div
                 key={i}
-                className="absolute inset-0 rounded-md border border-blue-800/40"
+                className="absolute inset-0 rounded-md"
                 style={{
                   transform: `translate(${offsetX}px, ${offsetY}px)`,
-                  background: `linear-gradient(135deg, rgba(30,40,80,${darkness}) 0%, rgba(20,20,60,${darkness + 0.1}) 100%)`,
+                  background: `linear-gradient(135deg, rgb(${Math.round(37 * brightness)},${Math.round(50 * brightness)},${Math.round(120 * brightness)}) 0%, rgb(${Math.round(25 * brightness)},${Math.round(25 * brightness)},${Math.round(90 * brightness)}) 100%)`,
                   zIndex: i,
+                  borderRight: '1.5px solid rgba(10,10,40,0.6)',
+                  borderBottom: '1.5px solid rgba(10,10,40,0.6)',
+                  borderTop: '0.5px solid rgba(100,130,200,0.2)',
+                  borderLeft: '0.5px solid rgba(100,130,200,0.15)',
                 }}
               />
             );

@@ -29,11 +29,11 @@ export default function BackgroundArt({ variant }: Props) {
         y: `+=${15 + i * 5}`,
         x: `+=${(i % 2 === 0 ? 1 : -1) * (8 + i * 4)}`,
         rotation: `+=${(i % 2 === 0 ? 1 : -1) * 8}`,
-        duration: 5 + i * 1.5,
+        duration: 2.5 + i * 0.8,
         repeat: -1,
         yoyo: true,
         ease: 'sine.inOut',
-        delay: i * 0.7,
+        delay: i * 0.4,
       });
     });
 
@@ -42,11 +42,11 @@ export default function BackgroundArt({ variant }: Props) {
       gsap.to(el, {
         y: `+=${10 + i * 4}`,
         rotation: `+=${(i % 2 === 0 ? 6 : -6)}`,
-        duration: 3.5 + i * 1.2,
+        duration: 2 + i * 0.7,
         repeat: -1,
         yoyo: true,
         ease: 'sine.inOut',
-        delay: i * 0.4,
+        delay: i * 0.3,
       });
     });
 
@@ -70,11 +70,11 @@ export default function BackgroundArt({ variant }: Props) {
         { y: startY + '%', opacity: 0 },
         {
           y: '-15%',
-          opacity: 0.3,
-          duration: 12 + i * 4,
+          opacity: 0.15,
+          duration: 7 + i * 2,
           repeat: -1,
           ease: 'none',
-          delay: i * 2.5,
+          delay: i * 1.5,
           onRepeat: () => {
             gsap.set(el, { x: `${(Math.random() - 0.5) * 30}px` });
           },
@@ -88,11 +88,11 @@ export default function BackgroundArt({ variant }: Props) {
         x: `+=${(i % 2 === 0 ? 1 : -1) * (25 + i * 8)}`,
         y: `+=${8 + i * 4}`,
         rotation: `+=${(i % 2 === 0 ? 12 : -12)}`,
-        duration: 7 + i * 2,
+        duration: 3.5 + i * 1,
         repeat: -1,
         yoyo: true,
         ease: 'sine.inOut',
-        delay: i * 1.3,
+        delay: i * 0.7,
       });
     });
 
@@ -100,20 +100,20 @@ export default function BackgroundArt({ variant }: Props) {
     pulses.forEach((el, i) => {
       gsap.to(el, {
         scale: 1.2,
-        opacity: 0.12,
-        duration: 2 + i * 0.5,
+        opacity: 0.08,
+        duration: 1.5 + i * 0.3,
         repeat: -1,
         yoyo: true,
         ease: 'sine.inOut',
-        delay: i * 0.8,
+        delay: i * 0.5,
       });
     });
 
-    // Slow spinners
+    // Spinners
     spinners.forEach((el, i) => {
       gsap.to(el, {
         rotation: 360,
-        duration: 20 + i * 8,
+        duration: 12 + i * 4,
         repeat: -1,
         ease: 'none',
       });
@@ -260,19 +260,19 @@ const HomeBackground = forwardRef<HTMLDivElement>((_props, ref) => (
   <div ref={ref} className="absolute inset-0 pointer-events-none overflow-hidden">
 
     {/* ═══ LARGE FLOATING CHOCOLATE BARS ═══ */}
-    <div className="bg-drift absolute opacity-30" style={{ top: '5%', left: '2%', transform: 'rotate(-12deg)' }}>
+    <div className="bg-drift absolute opacity-15" style={{ top: '5%', left: '2%', transform: 'rotate(-12deg)' }}>
       <ChocolateBar size={80} />
     </div>
-    <div className="bg-drift absolute opacity-25" style={{ top: '60%', right: '3%', transform: 'rotate(10deg)' }}>
+    <div className="bg-drift absolute opacity-[0.12]" style={{ top: '60%', right: '3%', transform: 'rotate(10deg)' }}>
       <ChocolateBar size={70} />
     </div>
-    <div className="bg-drift absolute opacity-20" style={{ top: '82%', left: '5%', transform: 'rotate(-6deg)' }}>
+    <div className="bg-drift absolute opacity-10" style={{ top: '82%', left: '5%', transform: 'rotate(-6deg)' }}>
       <ChocolateBar size={55} />
     </div>
-    <div className="bg-drift absolute opacity-25" style={{ top: '35%', right: '8%', transform: 'rotate(15deg)' }}>
+    <div className="bg-drift absolute opacity-[0.12]" style={{ top: '35%', right: '8%', transform: 'rotate(15deg)' }}>
       <ChocolateBar size={50} />
     </div>
-    <div className="bg-drift absolute opacity-20" style={{ top: '25%', left: '8%', transform: 'rotate(20deg)' }}>
+    <div className="bg-drift absolute opacity-10" style={{ top: '25%', left: '8%', transform: 'rotate(20deg)' }}>
       <ChocolateBar size={45} />
     </div>
 
@@ -298,100 +298,100 @@ const HomeBackground = forwardRef<HTMLDivElement>((_props, ref) => (
     ))}
 
     {/* ═══ FLOATING COCOA BEANS (static position, gentle bob) ═══ */}
-    <div className="bg-float absolute opacity-30" style={{ top: '18%', right: '12%', transform: 'rotate(25deg)' }}>
+    <div className="bg-float absolute opacity-15" style={{ top: '18%', right: '12%', transform: 'rotate(25deg)' }}>
       <CocoaBean size={22} />
     </div>
-    <div className="bg-float absolute opacity-25" style={{ top: '48%', left: '4%', transform: 'rotate(-20deg)' }}>
+    <div className="bg-float absolute opacity-[0.12]" style={{ top: '48%', left: '4%', transform: 'rotate(-20deg)' }}>
       <CocoaBean size={20} />
     </div>
-    <div className="bg-float absolute opacity-30" style={{ top: '33%', right: '5%', transform: 'rotate(15deg)' }}>
+    <div className="bg-float absolute opacity-15" style={{ top: '33%', right: '5%', transform: 'rotate(15deg)' }}>
       <CocoaBean size={24} />
     </div>
-    <div className="bg-float absolute opacity-20" style={{ top: '72%', left: '30%', transform: 'rotate(-30deg)' }}>
+    <div className="bg-float absolute opacity-10" style={{ top: '72%', left: '30%', transform: 'rotate(-30deg)' }}>
       <CocoaBean size={18} />
     </div>
-    <div className="bg-float absolute opacity-25" style={{ top: '90%', right: '40%', transform: 'rotate(40deg)' }}>
+    <div className="bg-float absolute opacity-[0.12]" style={{ top: '90%', right: '40%', transform: 'rotate(40deg)' }}>
       <CocoaBean size={20} />
     </div>
 
     {/* ═══ TRUFFLES ═══ */}
-    <div className="bg-float absolute opacity-30" style={{ top: '15%', left: '60%', transform: 'rotate(10deg)' }}>
+    <div className="bg-float absolute opacity-15" style={{ top: '15%', left: '60%', transform: 'rotate(10deg)' }}>
       <Truffle size={32} />
     </div>
-    <div className="bg-float absolute opacity-25" style={{ top: '75%', right: '15%', transform: 'rotate(-15deg)' }}>
+    <div className="bg-float absolute opacity-[0.12]" style={{ top: '75%', right: '15%', transform: 'rotate(-15deg)' }}>
       <Truffle size={28} />
     </div>
-    <div className="bg-drift absolute opacity-20" style={{ top: '50%', left: '85%', transform: 'rotate(30deg)' }}>
+    <div className="bg-drift absolute opacity-10" style={{ top: '50%', left: '85%', transform: 'rotate(30deg)' }}>
       <Truffle size={24} />
     </div>
 
     {/* ═══ CREAM SWIRLS ═══ */}
-    <div className="bg-spin absolute opacity-30" style={{ top: '20%', left: '40%' }}>
+    <div className="bg-spin absolute opacity-15" style={{ top: '20%', left: '40%' }}>
       <CreamSwirl size={60} />
     </div>
-    <div className="bg-spin absolute opacity-25" style={{ top: '65%', right: '30%' }}>
+    <div className="bg-spin absolute opacity-[0.12]" style={{ top: '65%', right: '30%' }}>
       <CreamSwirl size={45} />
     </div>
-    <div className="bg-spin absolute opacity-20" style={{ top: '88%', left: '60%' }}>
+    <div className="bg-spin absolute opacity-10" style={{ top: '88%', left: '60%' }}>
       <CreamSwirl size={55} />
     </div>
 
     {/* ═══ COFFEE CUPS ═══ */}
-    <div className="bg-float absolute opacity-25" style={{ top: '42%', left: '12%', transform: 'rotate(-5deg)' }}>
+    <div className="bg-float absolute opacity-[0.12]" style={{ top: '42%', left: '12%', transform: 'rotate(-5deg)' }}>
       <CoffeeCup size={36} />
     </div>
-    <div className="bg-float absolute opacity-20" style={{ top: '8%', right: '25%', transform: 'rotate(8deg)' }}>
+    <div className="bg-float absolute opacity-10" style={{ top: '8%', right: '25%', transform: 'rotate(8deg)' }}>
       <CoffeeCup size={30} />
     </div>
 
     {/* ═══ CHOCOLATE DRIPS FROM TOP ═══ */}
-    <div className="absolute opacity-40" style={{ top: '-2px', left: '10%' }}>
+    <div className="absolute opacity-20" style={{ top: '-2px', left: '10%' }}>
       <ChocolateDrip height={70} />
     </div>
-    <div className="absolute opacity-30" style={{ top: '-2px', left: '25%' }}>
+    <div className="absolute opacity-15" style={{ top: '-2px', left: '25%' }}>
       <ChocolateDrip height={55} />
     </div>
-    <div className="absolute opacity-30" style={{ top: '-2px', right: '18%', transform: 'scaleX(-1)' }}>
+    <div className="absolute opacity-15" style={{ top: '-2px', right: '18%', transform: 'scaleX(-1)' }}>
       <ChocolateDrip height={65} />
     </div>
-    <div className="absolute opacity-25" style={{ top: '-2px', left: '55%' }}>
+    <div className="absolute opacity-[0.12]" style={{ top: '-2px', left: '55%' }}>
       <ChocolateDrip height={50} />
     </div>
-    <div className="absolute opacity-25" style={{ top: '-2px', right: '8%' }}>
+    <div className="absolute opacity-[0.12]" style={{ top: '-2px', right: '8%' }}>
       <ChocolateDrip height={60} />
     </div>
-    <div className="absolute opacity-35" style={{ top: '-2px', left: '75%', transform: 'scaleX(-1)' }}>
+    <div className="absolute opacity-[0.18]" style={{ top: '-2px', left: '75%', transform: 'scaleX(-1)' }}>
       <ChocolateDrip height={45} />
     </div>
-    <div className="absolute opacity-20" style={{ top: '-2px', left: '42%' }}>
+    <div className="absolute opacity-10" style={{ top: '-2px', left: '42%' }}>
       <ChocolateDrip height={58} />
     </div>
 
     {/* ═══ CARD SILHOUETTES ═══ */}
-    <div className="bg-card absolute opacity-15" style={{ top: '8%', left: '78%', transform: 'rotate(5deg)' }}>
+    <div className="bg-card absolute opacity-[0.07]" style={{ top: '8%', left: '78%', transform: 'rotate(5deg)' }}>
       <CardSilhouette size={52} />
     </div>
-    <div className="bg-card absolute opacity-10" style={{ top: '45%', right: '2%', transform: 'rotate(-8deg)' }}>
+    <div className="bg-card absolute opacity-5" style={{ top: '45%', right: '2%', transform: 'rotate(-8deg)' }}>
       <CardSilhouette size={44} />
     </div>
-    <div className="bg-card absolute opacity-10" style={{ top: '55%', left: '1%', transform: 'rotate(12deg)' }}>
+    <div className="bg-card absolute opacity-5" style={{ top: '55%', left: '1%', transform: 'rotate(12deg)' }}>
       <CardSilhouette size={40} />
     </div>
-    <div className="bg-card absolute opacity-15" style={{ top: '70%', left: '65%', transform: 'rotate(12deg)' }}>
+    <div className="bg-card absolute opacity-[0.07]" style={{ top: '70%', left: '65%', transform: 'rotate(12deg)' }}>
       <CardSilhouette size={42} />
     </div>
-    <div className="bg-card absolute opacity-10" style={{ top: '3%', left: '50%', transform: 'rotate(-8deg)' }}>
+    <div className="bg-card absolute opacity-5" style={{ top: '3%', left: '50%', transform: 'rotate(-8deg)' }}>
       <CardSilhouette size={36} />
     </div>
 
     {/* ═══ GOLD COINS ═══ */}
-    <div className="bg-float absolute opacity-35" style={{ top: '28%', left: '75%' }}>
+    <div className="bg-float absolute opacity-15" style={{ top: '28%', left: '75%' }}>
       <GoldCoin size={26} />
     </div>
-    <div className="bg-float absolute opacity-30" style={{ top: '58%', left: '20%' }}>
+    <div className="bg-float absolute opacity-[0.12]" style={{ top: '58%', left: '20%' }}>
       <GoldCoin size={22} />
     </div>
-    <div className="bg-drift absolute opacity-25" style={{ top: '85%', right: '35%' }}>
+    <div className="bg-drift absolute opacity-10" style={{ top: '85%', right: '35%' }}>
       <GoldCoin size={20} />
     </div>
 
@@ -421,7 +421,7 @@ const HomeBackground = forwardRef<HTMLDivElement>((_props, ref) => (
       <svg
         key={`star-${i}`}
         className="bg-sparkle absolute"
-        style={{ top: pos.top, left: (pos as { left?: string }).left, right: (pos as { right?: string }).right, opacity: 0.4 + (i % 4) * 0.1 }}
+        style={{ top: pos.top, left: (pos as { left?: string }).left, right: (pos as { right?: string }).right, opacity: 0.2 + (i % 4) * 0.05 }}
         width={pos.s}
         height={pos.s}
         viewBox="0 0 10 10"
@@ -434,45 +434,45 @@ const HomeBackground = forwardRef<HTMLDivElement>((_props, ref) => (
     <div className="bg-pulse absolute rounded-full" style={{
       top: '20%', left: '50%', transform: 'translate(-50%, -50%)',
       width: 140, height: 140,
-      background: 'radial-gradient(circle, rgba(245,193,108,0.15) 0%, transparent 70%)',
+      background: 'radial-gradient(circle, rgba(245,193,108,0.08) 0%, transparent 70%)',
     }} />
     <div className="bg-pulse absolute rounded-full" style={{
       top: '70%', left: '30%', transform: 'translate(-50%, -50%)',
       width: 110, height: 110,
-      background: 'radial-gradient(circle, rgba(245,193,108,0.12) 0%, transparent 70%)',
+      background: 'radial-gradient(circle, rgba(245,193,108,0.06) 0%, transparent 70%)',
     }} />
     <div className="bg-pulse absolute rounded-full" style={{
       top: '50%', right: '10%',
       width: 90, height: 90,
-      background: 'radial-gradient(circle, rgba(139,90,43,0.15) 0%, transparent 70%)',
+      background: 'radial-gradient(circle, rgba(139,90,43,0.08) 0%, transparent 70%)',
     }} />
 
     {/* ═══ DECORATIVE RINGS ═══ */}
-    <svg className="bg-spin absolute opacity-15" style={{ top: '30%', left: '50%', transform: 'translate(-50%, -50%)' }} width="350" height="350" viewBox="0 0 350 350" fill="none">
+    <svg className="bg-spin absolute opacity-[0.07]" style={{ top: '30%', left: '50%', transform: 'translate(-50%, -50%)' }} width="350" height="350" viewBox="0 0 350 350" fill="none">
       <circle cx="175" cy="175" r="130" stroke="#f5c16c" strokeWidth="0.8" />
       <circle cx="175" cy="175" r="155" stroke="#f5c16c" strokeWidth="0.5" />
       <circle cx="175" cy="175" r="110" stroke="#8d6e63" strokeWidth="0.6" strokeDasharray="4 8" />
       <circle cx="175" cy="175" r="80" stroke="#f5c16c" strokeWidth="0.4" strokeDasharray="2 6" />
     </svg>
 
-    <svg className="absolute opacity-10" style={{ top: '75%', left: '50%', transform: 'translate(-50%, -50%)' }} width="200" height="200" viewBox="0 0 200 200" fill="none">
+    <svg className="absolute opacity-5" style={{ top: '75%', left: '50%', transform: 'translate(-50%, -50%)' }} width="200" height="200" viewBox="0 0 200 200" fill="none">
       <circle cx="100" cy="100" r="80" stroke="#8d6e63" strokeWidth="0.8" strokeDasharray="3 5" />
       <circle cx="100" cy="100" r="60" stroke="#f5c16c" strokeWidth="0.5" />
     </svg>
 
     {/* ═══ CHOCOLATE SWIRL PATTERNS ═══ */}
-    <svg className="bg-spin absolute opacity-15" style={{ bottom: '8%', right: '8%' }} width="100" height="100" viewBox="0 0 80 80" fill="none">
+    <svg className="bg-spin absolute opacity-[0.07]" style={{ bottom: '8%', right: '8%' }} width="100" height="100" viewBox="0 0 80 80" fill="none">
       <path d="M40 10 Q60 20 50 40 Q40 60 20 50 Q0 40 10 20 Q20 0 40 10" stroke="#d4a04a" strokeWidth="1.5" />
       <path d="M40 20 Q50 25 47 37 Q44 50 30 47 Q16 44 19 30 Q22 16 40 20" stroke="#d4a04a" strokeWidth="1" />
       <circle cx="40" cy="35" r="3" fill="#d4a04a" opacity={0.4} />
     </svg>
-    <svg className="bg-spin absolute opacity-10" style={{ top: '10%', left: '15%' }} width="70" height="70" viewBox="0 0 80 80" fill="none">
+    <svg className="bg-spin absolute opacity-5" style={{ top: '10%', left: '15%' }} width="70" height="70" viewBox="0 0 80 80" fill="none">
       <path d="M40 10 Q60 20 50 40 Q40 60 20 50 Q0 40 10 20 Q20 0 40 10" stroke="#8d6e63" strokeWidth="1.2" />
       <path d="M40 20 Q50 25 47 37 Q44 50 30 47 Q16 44 19 30 Q22 16 40 20" stroke="#8d6e63" strokeWidth="0.8" />
     </svg>
 
     {/* ═══ DIAGONAL SHIMMER LINES ═══ */}
-    <svg className="absolute inset-0 w-full h-full opacity-[0.06]" preserveAspectRatio="none">
+    <svg className="absolute inset-0 w-full h-full opacity-[0.03]" preserveAspectRatio="none">
       <line x1="0" y1="20%" x2="100%" y2="60%" stroke="#f5c16c" strokeWidth="0.8" />
       <line x1="0" y1="50%" x2="100%" y2="90%" stroke="#f5c16c" strokeWidth="0.5" />
       <line x1="0" y1="80%" x2="100%" y2="30%" stroke="#8d6e63" strokeWidth="0.6" />
@@ -484,39 +484,63 @@ HomeBackground.displayName = 'HomeBackground';
 
 const GameBackground = forwardRef<HTMLDivElement>((_props, ref) => (
   <div ref={ref} className="absolute inset-0 pointer-events-none overflow-hidden">
-    {/* Subtle corner chocolate bars */}
-    <div className="bg-card absolute opacity-[0.03]" style={{ top: '-5%', left: '-2%', transform: 'rotate(-15deg)' }}>
+    {/* Floating chocolate bars */}
+    <div className="bg-drift absolute opacity-[0.06]" style={{ top: '2%', left: '-2%', transform: 'rotate(-15deg)' }}>
       <ChocolateBar size={50} />
     </div>
-    <div className="bg-card absolute opacity-[0.025]" style={{ top: '-3%', right: '-1%', transform: 'rotate(12deg)' }}>
+    <div className="bg-drift absolute opacity-[0.05]" style={{ top: '60%', right: '-1%', transform: 'rotate(12deg)' }}>
       <ChocolateBar size={40} />
     </div>
-    <div className="bg-card absolute opacity-[0.02]" style={{ bottom: '-2%', left: '5%', transform: 'rotate(8deg)' }}>
+    <div className="bg-drift absolute opacity-[0.04]" style={{ bottom: '5%', left: '5%', transform: 'rotate(8deg)' }}>
       <ChocolateBar size={35} />
     </div>
-    <div className="bg-card absolute opacity-[0.02]" style={{ bottom: '-3%', right: '8%', transform: 'rotate(-10deg)' }}>
+    <div className="bg-drift absolute opacity-[0.05]" style={{ top: '30%', right: '3%', transform: 'rotate(-10deg)' }}>
       <ChocolateBar size={42} />
     </div>
 
-    {/* Subtle cocoa beans */}
-    <div className="bg-float absolute opacity-[0.025]" style={{ top: '3%', left: '40%', transform: 'rotate(20deg)' }}>
-      <CocoaBean size={10} />
+    {/* Floating cocoa beans */}
+    <div className="bg-float absolute opacity-[0.06]" style={{ top: '3%', left: '40%', transform: 'rotate(20deg)' }}>
+      <CocoaBean size={14} />
     </div>
-    <div className="bg-float absolute opacity-[0.02]" style={{ bottom: '5%', right: '30%', transform: 'rotate(-15deg)' }}>
+    <div className="bg-float absolute opacity-[0.05]" style={{ bottom: '5%', right: '30%', transform: 'rotate(-15deg)' }}>
+      <CocoaBean size={16} />
+    </div>
+    <div className="bg-float absolute opacity-[0.05]" style={{ top: '45%', left: '2%', transform: 'rotate(30deg)' }}>
       <CocoaBean size={12} />
     </div>
+    <div className="bg-float absolute opacity-[0.04]" style={{ top: '80%', right: '15%', transform: 'rotate(-25deg)' }}>
+      <CocoaBean size={14} />
+    </div>
 
-    {/* Fewer, more subtle sparkles during gameplay */}
+    {/* Truffles */}
+    <div className="bg-float absolute opacity-[0.05]" style={{ top: '15%', right: '10%', transform: 'rotate(10deg)' }}>
+      <Truffle size={22} />
+    </div>
+    <div className="bg-drift absolute opacity-[0.04]" style={{ top: '70%', left: '8%', transform: 'rotate(-20deg)' }}>
+      <Truffle size={18} />
+    </div>
+
+    {/* Gold coins */}
+    <div className="bg-float absolute opacity-[0.06]" style={{ top: '10%', left: '80%' }}>
+      <GoldCoin size={18} />
+    </div>
+    <div className="bg-float absolute opacity-[0.05]" style={{ top: '85%', left: '25%' }}>
+      <GoldCoin size={16} />
+    </div>
+
+    {/* Sparkles */}
     {[
       { top: '5%', left: '15%' },
       { top: '10%', right: '12%' },
+      { top: '50%', left: '3%' },
+      { top: '55%', right: '5%' },
       { top: '88%', left: '20%' },
       { top: '92%', right: '18%' },
     ].map((pos, i) => (
       <svg
         key={i}
         className="bg-sparkle absolute"
-        style={{ ...pos, opacity: 0.1 }}
+        style={{ ...pos, opacity: 0.08 + (i % 3) * 0.02 }}
         width="7"
         height="7"
         viewBox="0 0 7 7"
@@ -524,6 +548,18 @@ const GameBackground = forwardRef<HTMLDivElement>((_props, ref) => (
         <path d="M3.5 0L3.9 2.9L7 3.5L3.9 4.1L3.5 7L3.1 4.1L0 3.5L3.1 2.9Z" fill="#f5c16c" />
       </svg>
     ))}
+
+    {/* Cream swirl */}
+    <div className="bg-spin absolute opacity-[0.04]" style={{ top: '40%', right: '5%' }}>
+      <CreamSwirl size={35} />
+    </div>
+
+    {/* Glow orb */}
+    <div className="bg-pulse absolute rounded-full" style={{
+      top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+      width: 120, height: 120,
+      background: 'radial-gradient(circle, rgba(245,193,108,0.04) 0%, transparent 70%)',
+    }} />
   </div>
 ));
 

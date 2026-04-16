@@ -424,49 +424,54 @@ export default function GameScreen() {
           </div>
         </div>
 
-        {/* Center area — piles */}
-        <div className="flex-1 flex items-center justify-center gap-4 px-3 relative">
-          <div
-            ref={drawPileRef}
-            onPointerDown={isMyTurn && gameState.turnPhase === 'draw' ? (e) => handlePileDragStart(e, 'pile') : undefined}
-            style={{ touchAction: 'none' }}
-          >
-            <DrawPile
-              count={gameState.drawPileCount}
-              active={isMyTurn && gameState.turnPhase === 'draw'}
-              onClick={handleDrawFromPile}
-              revealedCard={revealedCard}
-            />
-          </div>
-
-          {/* Discard pile */}
-          <div
-            ref={discardPileRef}
-            data-discard-pile="true"
-            style={{ touchAction: 'none' }}
-            onPointerDown={isMyTurn && gameState.turnPhase === 'draw' && gameState.discardTop !== null ? (e) => handlePileDragStart(e, 'discard') : undefined}
-            onClick={hasDrawnCard && canDiscard ? () => socket.emit('discard-drawn-card') : undefined}
-          >
-            <DiscardPile
-              topCard={gameState.discardTop}
-              active={(isMyTurn && gameState.turnPhase === 'draw' && gameState.discardTop !== null) || overDiscard || (hasDrawnCard && canDiscard)}
-              onClick={hasDrawnCard && canDiscard ? () => socket.emit('discard-drawn-card') : handleDrawFromDiscard}
-            />
-          </div>
-
-          {/* Drawn card shown between piles */}
-          {hasDrawnCard && !isDragging && (
+        {/* Center area — piles + held card */}
+        <div className="flex-1 flex flex-col items-center justify-center px-3 relative">
+          {/* Piles row */}
+          <div className="flex items-center justify-center gap-4">
             <div
-              onPointerDown={handleDragStart}
+              ref={drawPileRef}
+              onPointerDown={isMyTurn && gameState.turnPhase === 'draw' ? (e) => handlePileDragStart(e, 'pile') : undefined}
               style={{ touchAction: 'none' }}
             >
-              <DrawnCard
-                value={gameState.drawnCard!}
-                canDiscard={canDiscard}
+              <DrawPile
+                count={gameState.drawPileCount}
+                active={isMyTurn && gameState.turnPhase === 'draw'}
+                onClick={handleDrawFromPile}
+                revealedCard={revealedCard}
               />
             </div>
-          )}
 
+            {/* Discard pile */}
+            <div
+              ref={discardPileRef}
+              data-discard-pile="true"
+              style={{ touchAction: 'none' }}
+              onPointerDown={isMyTurn && gameState.turnPhase === 'draw' && gameState.discardTop !== null ? (e) => handlePileDragStart(e, 'discard') : undefined}
+              onClick={hasDrawnCard && canDiscard ? () => socket.emit('discard-drawn-card') : undefined}
+            >
+              <DiscardPile
+                topCard={gameState.discardTop}
+                active={!hasDrawnCard && (isMyTurn && gameState.turnPhase === 'draw' && gameState.discardTop !== null)}
+                onClick={hasDrawnCard && canDiscard ? () => socket.emit('discard-drawn-card') : handleDrawFromDiscard}
+              />
+            </div>
+          </div>
+
+          {/* Drawn card — shown below piles, "held in hand" */}
+          <div className="h-[5.5rem]">
+            {hasDrawnCard && (
+              <div
+                onPointerDown={handleDragStart}
+                style={{ touchAction: 'none', visibility: isDragging ? 'hidden' : 'visible' }}
+                className="mt-2"
+              >
+                <DrawnCard
+                  value={gameState.drawnCard!}
+                  canDiscard={canDiscard}
+                />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Turn indicator */}
