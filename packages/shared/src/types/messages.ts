@@ -33,10 +33,17 @@ export interface RemoveBotPayload {
   botId: string;
 }
 
+export interface StartSinglePlayerPayload {
+  nickname: string;
+  avatar: string;
+  botCount?: number;
+}
+
 export interface ClientEvents {
   'create-room': (payload: CreateRoomPayload) => void;
   'join-room': (payload: JoinRoomPayload) => void;
   'start-game': () => void;
+  'start-single-player': (payload: StartSinglePlayerPayload) => void;
   'flip-initial-card': (payload: FlipInitialCardPayload) => void;
   'draw-from-pile': () => void;
   'draw-from-discard': () => void;

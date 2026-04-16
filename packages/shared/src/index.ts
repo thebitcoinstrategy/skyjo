@@ -30,6 +30,7 @@ export type {
   FlipCardPayload,
   AddBotPayload,
   RemoveBotPayload,
+  StartSinglePlayerPayload,
   ClientEvents,
   LobbyPlayer,
   RoomCreatedPayload,

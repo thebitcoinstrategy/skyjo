@@ -22,6 +22,10 @@ export function registerSocketHandlers(
       roomManager.startGame(io, socket);
     });
 
+    socket.on('start-single-player', (payload) => {
+      roomManager.startSinglePlayer(io, socket, payload);
+    });
+
     socket.on('flip-initial-card', (payload) => {
       roomManager.flipInitialCard(io, socket, payload);
     });

@@ -72,7 +72,7 @@ export default function HomeScreen() {
   const handleSinglePlayer = () => {
     if (!canSubmit) return;
     saveProfile();
-    socket.emit('create-room', { nickname: nickname.trim(), avatar });
+    socket.emit('start-single-player', { nickname: nickname.trim(), avatar, botCount: 3 });
   };
 
   const handleAvatarClick = (a: string, el: HTMLButtonElement) => {

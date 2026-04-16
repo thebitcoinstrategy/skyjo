@@ -9,6 +9,7 @@ import type {
   FlipCardPayload,
   AddBotPayload,
   RemoveBotPayload,
+  StartSinglePlayerPayload,
   LobbyPlayer,
 } from '@skyjo/shared';
 import { MAX_PLAYERS, MIN_PLAYERS } from '@skyjo/shared';
@@ -82,6 +83,79 @@ export class RoomManager {
       playerId,
       lobby: this.getLobbyPlayers(room),
     });
+  }
+
+  startSinglePlayer(
+    io: Server<ClientEvents, ServerEvents>,
+    socket: Socket<ClientEvents, ServerEvents>,
+    payload: StartSinglePlayerPayload
+  ): void {
+    // Create room
+    const code = generateRoomCode(this.roomCodes);
+    const playerId = socket.id;
+
+    const player: RoomPlayer = {
+      id: playerId,
+      socketId: socket.id,
+      nickname: payload.nickname,
+      avatar: payload.avatar,
+      isHost: true,
+      isBot: false,
+    };
+
+    const room: Room = {
+      code,
+      players: [player],
+      engine: null,
+      hostId: playerId,
+      botDifficulty: new BotDifficulty(),
+    };
+
+    // Add bots
+    const botCount = Math.max(1, Math.min(7, payload.botCount ?? 3));
+    const botNames = [
+      'Anna', 'Ben', 'Clara', 'David', 'Elena', 'Felix', 'Greta',
+    ];
+    for (let i = 0; i < botCount; i++) {
+      const botId = `bot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      room.players.push({
+        id: botId,
+        socketId: '',
+        nickname: botNames[i % botNames.length],
+        avatar: '🤖',
+        isHost: false,
+        isBot: true,
+      });
+    }
+
+    this.rooms.set(code, room);
+    this.roomCodes.add(code);
+    socketRoomMap.set(socket.id, code);
+    socket.join(code);
+
+    // Start the game immediately
+    const playerInfos = room.players.map((p) => ({
+      id: p.id,
+      nickname: p.nickname,
+      avatar: p.avatar,
+      isBot: p.isBot,
+    }));
+
+    room.engine = new GameEngine(playerInfos);
+    room.engine.startRound();
+    log(code, `Single-player game started! ${room.players.length} players: ${room.players.map(p => `${p.nickname}${p.isBot ? '(bot)' : ''}`).join(', ')}`);
+
+    socket.emit('room-created', {
+      roomCode: code,
+      playerId,
+      lobby: this.getLobbyPlayers(room),
+    });
+
+    const visibleState = room.engine.getVisibleState(playerId);
+    socket.emit('game-started', visibleState);
+
+    // Process bot initial flips
+    this.processBotTurns(io, room);
   }
 
   joinRoom(
