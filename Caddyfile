@@ -1,0 +1,7 @@
+# Replace YOUR_DOMAIN with your duckdns subdomain or droplet IP
+# Example: skyjo.duckdns.org
+# For IP-only (no HTTPS): :80
+
+YOUR_DOMAIN {
+    reverse_proxy localhost:3000
+}

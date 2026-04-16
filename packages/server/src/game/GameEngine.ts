@@ -395,7 +395,7 @@ export class GameEngine {
     const colIdx = findMatchingColumn(player.cards);
     if (colIdx >= 0) {
       // Move eliminated cards to discard
-      const colCards = [];
+      const colCards: CardValue[] = [];
       const startIdx = colIdx * 4;
       for (let r = 0; r < 4; r++) {
         colCards.push(player.cards[startIdx + r].value);

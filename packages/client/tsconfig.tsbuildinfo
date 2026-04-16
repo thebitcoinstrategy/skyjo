@@ -1,1 +1,0 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/components/card/card.tsx","./src/hooks/usesocket.ts","./src/screens/gamescreen.tsx","./src/screens/homescreen.tsx","./src/screens/lobbyscreen.tsx","./src/screens/resultsscreen.tsx","./src/socket/client.ts","./src/stores/connectionstore.ts","./src/stores/gamestore.ts","./src/stores/settingsstore.ts"],"errors":true,"version":"5.9.3"}

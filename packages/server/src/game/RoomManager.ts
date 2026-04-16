@@ -13,6 +13,8 @@ import type {
 } from '@skyjo/shared';
 import { MAX_PLAYERS, MIN_PLAYERS } from '@skyjo/shared';
 import { GameEngine } from './GameEngine.js';
+import { Bot } from './Bot.js';
+import { BotDifficulty } from './BotDifficulty.js';
 import { generateRoomCode } from '../utils/roomCodes.js';
 
 interface RoomPlayer {
@@ -29,6 +31,7 @@ interface Room {
   players: RoomPlayer[];
   engine: GameEngine | null;
   hostId: string;
+  botDifficulty: BotDifficulty;
 }
 
 // Map socketId -> roomCode
@@ -60,6 +63,7 @@ export class RoomManager {
       players: [player],
       engine: null,
       hostId: playerId,
+      botDifficulty: new BotDifficulty(),
     };
 
     this.rooms.set(code, room);
@@ -480,7 +484,9 @@ export class RoomManager {
       const scores = room.engine.getRoundScores();
       io.to(room.code).emit('round-ended', scores);
 
-      if (room.engine.state.phase === 'game_over') {
+      // getRoundScores() may change phase to 'game_over'
+      const phaseAfterScoring = room.engine.state.phase as string;
+      if (phaseAfterScoring === 'game_over') {
         const finalScores: Record<string, number> = {};
         let winnerId = '';
         let lowestScore = Infinity;
@@ -503,8 +509,152 @@ export class RoomManager {
     room: Room
   ): void {
     if (!room.engine) return;
+    const engine = room.engine;
+    const state = engine.state;
 
-    // Bot processing will be implemented in Phase 6
-    // For now, skip bot turns
+    // Handle bot initial flips
+    if (state.phase === 'flipping_initial') {
+      for (const player of state.players) {
+        if (!player.isBot || player.initialFlipsRemaining <= 0) continue;
+
+        const tier = room.botDifficulty.getTier();
+        const delay = 800 + Math.random() * 1200; // 800-2000ms
+
+        setTimeout(() => {
+          while (player.initialFlipsRemaining > 0) {
+            const cardIndex = Bot.decideInitialFlip(player, tier);
+            if (cardIndex < 0) break;
+
+            const result = engine.flipInitialCard(player.id, cardIndex);
+            if (result.ok) {
+              io.to(room.code).emit('animation-event', {
+                type: 'flip-card',
+                playerId: player.id,
+                data: { cardIndex },
+              });
+            }
+          }
+
+          this.broadcastGameState(io, room);
+
+          // Check if all initial flips done -> game might have started playing
+          if (state.phase === 'playing') {
+            this.processBotTurns(io, room);
+          }
+        }, delay);
+      }
+      return;
+    }
+
+    // Handle bot regular turns
+    if (state.phase !== 'playing' && state.phase !== 'final_round') return;
+
+    const currentPlayer = state.players[state.currentPlayerIndex];
+    if (!currentPlayer.isBot) return;
+
+    const tier = room.botDifficulty.getTier();
+    const mistakeRate = room.botDifficulty.getMistakeRate();
+
+    const executeBotActions = () => {
+      const actions = Bot.decide(state, currentPlayer.id, tier, mistakeRate);
+
+      for (const action of actions) {
+        const actionDelay = 600 + Math.random() * 800;
+
+        setTimeout(() => {
+          let result;
+
+          switch (action.type) {
+            case 'draw-from-pile':
+              result = engine.drawFromPile(currentPlayer.id);
+              if (result.ok) {
+                io.to(room.code).emit('animation-event', {
+                  type: 'draw-from-pile',
+                  playerId: currentPlayer.id,
+                  data: {},
+                });
+              }
+              break;
+
+            case 'draw-from-discard':
+              result = engine.drawFromDiscard(currentPlayer.id);
+              if (result.ok) {
+                io.to(room.code).emit('animation-event', {
+                  type: 'draw-from-discard',
+                  playerId: currentPlayer.id,
+                  data: {},
+                });
+              }
+              break;
+
+            case 'place-drawn-card':
+              result = engine.placeDrawnCard(currentPlayer.id, action.cardIndex!);
+              if (result.ok) {
+                io.to(room.code).emit('animation-event', {
+                  type: 'place-card',
+                  playerId: currentPlayer.id,
+                  data: { cardIndex: action.cardIndex, columnEliminated: result.columnEliminated },
+                });
+                if (result.columnEliminated !== undefined) {
+                  io.to(room.code).emit('animation-event', {
+                    type: 'column-eliminate',
+                    playerId: currentPlayer.id,
+                    data: { column: result.columnEliminated },
+                  });
+                }
+              }
+              break;
+
+            case 'discard-drawn-card':
+              result = engine.discardDrawnCard(currentPlayer.id);
+              if (result.ok) {
+                io.to(room.code).emit('animation-event', {
+                  type: 'discard-card',
+                  playerId: currentPlayer.id,
+                  data: {},
+                });
+              }
+              break;
+
+            case 'flip-card':
+              result = engine.flipCard(currentPlayer.id, action.cardIndex!);
+              if (result.ok) {
+                io.to(room.code).emit('animation-event', {
+                  type: 'flip-card',
+                  playerId: currentPlayer.id,
+                  data: { cardIndex: action.cardIndex, columnEliminated: result.columnEliminated },
+                });
+                if (result.columnEliminated !== undefined) {
+                  io.to(room.code).emit('animation-event', {
+                    type: 'column-eliminate',
+                    playerId: currentPlayer.id,
+                    data: { column: result.columnEliminated },
+                  });
+                }
+              }
+              break;
+          }
+
+          this.broadcastGameState(io, room);
+        }, actionDelay);
+      }
+
+      // After all bot actions, check for next bot turn or round end
+      const totalDelay = actions.length * 1400 + 500;
+      setTimeout(() => {
+        this.checkRoundEnd(io, room);
+        // If next player is also a bot, process their turn too
+        if (state.phase === 'playing' || state.phase === 'final_round') {
+          const nextPlayer = state.players[state.currentPlayerIndex];
+          if (nextPlayer?.isBot) {
+            this.processBotTurns(io, room);
+          }
+        }
+      }, totalDelay);
+    };
+
+    // Initial delay before bot starts its turn
+    const initialDelay = 800 + Math.random() * 1200;
+    setTimeout(executeBotActions, initialDelay);
   }
 }

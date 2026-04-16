@@ -1,17 +1,67 @@
+import { useRef, useState, useCallback } from 'react';
+import { gsap } from 'gsap';
 import { useGameStore } from '../stores/gameStore';
 import { useConnectionStore } from '../stores/connectionStore';
+import { useAnimationQueue } from '../hooks/useAnimationQueue';
 import { socket } from '../socket/client';
-import Card from '../components/Card/Card';
-import type { VisibleCardSlot } from '@skyjo/shared';
+import PlayerHand from '../components/PlayerHand/PlayerHand';
+import DrawPile from '../components/DrawPile';
+import DiscardPile from '../components/DiscardPile';
+import DrawnCard from '../components/DrawnCard';
+import TurnIndicator from '../components/TurnIndicator';
+import type { AnimationEventPayload } from '@skyjo/shared';
 
 export default function GameScreen() {
   const gameState = useGameStore((s) => s.gameState);
   const playerId = useConnectionStore((s) => s.playerId);
+  const [isDealing, setIsDealing] = useState(true);
+  const myHandRef = useRef<HTMLDivElement>(null);
+
+  // Animation queue handler
+  const handleAnimation = useCallback(async (event: AnimationEventPayload) => {
+    // Short delay for visual processing
+    await new Promise((r) => setTimeout(r, 150));
+
+    switch (event.type) {
+      case 'flip-card': {
+        // The Card component handles its own flip animation via the faceUp prop change
+        await new Promise((r) => setTimeout(r, 500));
+        break;
+      }
+      case 'column-eliminate': {
+        // Flash the screen subtly for column elimination
+        if (myHandRef.current) {
+          gsap.fromTo(
+            myHandRef.current,
+            { boxShadow: '0 0 30px rgba(255, 215, 0, 0.5)' },
+            { boxShadow: '0 0 0px rgba(255, 215, 0, 0)', duration: 0.8, ease: 'power2.out' }
+          );
+        }
+        await new Promise((r) => setTimeout(r, 600));
+        break;
+      }
+      case 'draw-from-pile':
+      case 'draw-from-discard': {
+        await new Promise((r) => setTimeout(r, 300));
+        break;
+      }
+      case 'place-card':
+      case 'discard-card': {
+        await new Promise((r) => setTimeout(r, 400));
+        break;
+      }
+      default: {
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    }
+  }, []);
+
+  useAnimationQueue(handleAnimation);
 
   if (!gameState || !playerId) {
     return (
-      <div className="h-full flex items-center justify-center bg-felt-dark text-white">
-        Loading...
+      <div className="h-full flex items-center justify-center bg-felt-dark">
+        <div className="text-gold text-lg font-bold animate-pulse">Loading...</div>
       </div>
     );
   }
@@ -21,6 +71,8 @@ export default function GameScreen() {
   const opponents = gameState.players.filter((p) => p.id !== playerId);
   const isMyTurn = gameState.currentPlayerIndex === myIndex;
   const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+
+  const canInteract = isMyTurn || (gameState.phase === 'flipping_initial' && me.initialFlipsRemaining > 0);
 
   const handleDrawFromPile = () => {
     if (!isMyTurn || gameState.turnPhase !== 'draw') return;
@@ -33,9 +85,6 @@ export default function GameScreen() {
   };
 
   const handleCardClick = (cardIndex: number) => {
-    if (!isMyTurn) return;
-
-    // Initial flip phase
     if (gameState.phase === 'flipping_initial' && me.initialFlipsRemaining > 0) {
       if (!me.cards[cardIndex].faceUp) {
         socket.emit('flip-initial-card', { cardIndex });
@@ -43,13 +92,13 @@ export default function GameScreen() {
       return;
     }
 
-    // Place drawn card
+    if (!isMyTurn) return;
+
     if (gameState.turnPhase === 'place_or_discard' || gameState.turnPhase === 'place_discard') {
       socket.emit('place-drawn-card', { cardIndex });
       return;
     }
 
-    // Flip after discarding
     if (gameState.turnPhase === 'must_flip') {
       if (!me.cards[cardIndex].faceUp) {
         socket.emit('flip-card', { cardIndex });
@@ -63,13 +112,12 @@ export default function GameScreen() {
     socket.emit('discard-drawn-card');
   };
 
-  // Get instruction text
   const getInstruction = (): string => {
     if (gameState.phase === 'flipping_initial') {
       if (me.initialFlipsRemaining > 0) {
         return `Flip ${me.initialFlipsRemaining} card${me.initialFlipsRemaining > 1 ? 's' : ''}`;
       }
-      return 'Waiting for others to flip...';
+      return 'Waiting for others...';
     }
     if (!isMyTurn) return `${currentPlayer.nickname}'s turn`;
     switch (gameState.turnPhase) {
@@ -81,191 +129,109 @@ export default function GameScreen() {
     }
   };
 
-  const renderCardGrid = (
-    cards: VisibleCardSlot[],
-    small: boolean,
-    onCardClick?: (i: number) => void
-  ) => {
-    // Cards are in column-major order: determine actual grid dimensions
-    const totalCards = cards.length;
-    const rows = 4;
-    const cols = Math.ceil(totalCards / rows);
-
-    return (
-      <div
-        className="grid gap-1"
-        style={{
-          gridTemplateColumns: `repeat(${cols}, 1fr)`,
-          gridTemplateRows: `repeat(${rows}, 1fr)`,
-        }}
-      >
-        {/* Render in row-major order for CSS grid */}
-        {Array.from({ length: rows }, (_, row) =>
-          Array.from({ length: cols }, (_, col) => {
-            const cardIdx = col * rows + row;
-            if (cardIdx >= totalCards) return null;
-            const card = cards[cardIdx];
-            return (
-              <Card
-                key={`${col}-${row}`}
-                value={card.value}
-                faceUp={card.faceUp}
-                small={small}
-                onClick={onCardClick ? () => onCardClick(cardIdx) : undefined}
-                interactive={!!onCardClick}
-              />
-            );
-          })
-        )}
-      </div>
-    );
-  };
-
   return (
-    <div className="h-full flex flex-col bg-gradient-to-b from-felt-dark via-felt to-felt-dark overflow-hidden">
-      {/* Opponents */}
-      <div className="flex-none px-2 pt-2 pb-1">
-        <div className="flex gap-2 overflow-x-auto">
-          {opponents.map((opp) => {
-            const oppIndex = gameState.players.findIndex((p) => p.id === opp.id);
-            const isActive = gameState.currentPlayerIndex === oppIndex;
-            return (
-              <div
-                key={opp.id}
-                className={`flex-shrink-0 p-2 rounded-xl transition-all ${
-                  isActive ? 'bg-gold/20 ring-2 ring-gold' : 'bg-white/5'
-                }`}
-              >
-                <div className="flex items-center gap-1 mb-1">
-                  <span className="text-sm">{opp.avatar}</span>
-                  <span className="text-white/70 text-xs font-medium truncate max-w-[60px]">
-                    {opp.nickname}
-                  </span>
-                  <span className="text-white/40 text-xs ml-auto">{opp.score}</span>
+    <div className="h-full flex flex-col overflow-hidden relative">
+      {/* Background */}
+      <div className="absolute inset-0 bg-gradient-to-b from-[#0c331a] via-felt to-[#0c331a]" />
+      <div
+        className="absolute inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)',
+          backgroundSize: '20px 20px',
+        }}
+      />
+
+      {/* Content */}
+      <div className="relative z-10 h-full flex flex-col">
+        {/* Opponents area */}
+        <div className="flex-none px-2 pt-2 pb-1">
+          <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
+            {opponents.map((opp) => {
+              const oppIndex = gameState.players.findIndex((p) => p.id === opp.id);
+              const isActive = gameState.currentPlayerIndex === oppIndex;
+              return (
+                <div
+                  key={opp.id}
+                  className={`flex-shrink-0 p-2 rounded-xl transition-all duration-300 ${
+                    isActive
+                      ? 'bg-gold/15 ring-2 ring-gold/60 shadow-lg shadow-gold/10'
+                      : 'bg-white/5'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <span className="text-sm">{opp.avatar}</span>
+                    <span className="text-white/80 text-[11px] font-semibold truncate max-w-[60px]">
+                      {opp.nickname}
+                    </span>
+                    <span className={`text-[11px] font-mono ml-auto ${opp.score < 0 ? 'text-green-400' : opp.score > 0 ? 'text-red-400' : 'text-white/40'}`}>
+                      {opp.score}
+                    </span>
+                  </div>
+                  <PlayerHand cards={opp.cards} small />
                 </div>
-                {renderCardGrid(opp.cards, true)}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
 
-      {/* Center area: draw pile, discard pile, drawn card */}
-      <div className="flex-1 flex items-center justify-center gap-6 px-4">
-        {/* Draw pile */}
-        <button
-          onClick={handleDrawFromPile}
-          disabled={!isMyTurn || gameState.turnPhase !== 'draw'}
-          className={`relative w-16 h-24 rounded-xl border-2 flex items-center justify-center transition-all ${
-            isMyTurn && gameState.turnPhase === 'draw'
-              ? 'border-gold bg-card-back shadow-lg shadow-gold/20 hover:scale-105 active:scale-95 cursor-pointer'
-              : 'border-white/20 bg-card-back/80 opacity-60 cursor-default'
-          }`}
-        >
-          <span className="text-white/60 text-xs font-medium">{gameState.drawPileCount}</span>
-        </button>
+        {/* Center area */}
+        <div className="flex-1 flex items-center justify-center gap-8 px-6">
+          <DrawPile
+            count={gameState.drawPileCount}
+            active={isMyTurn && gameState.turnPhase === 'draw'}
+            onClick={handleDrawFromPile}
+          />
 
-        {/* Discard pile */}
-        <button
-          onClick={handleDrawFromDiscard}
-          disabled={!isMyTurn || gameState.turnPhase !== 'draw' || gameState.discardTop === null}
-          className={`relative w-16 h-24 rounded-xl border-2 flex items-center justify-center transition-all ${
-            isMyTurn && gameState.turnPhase === 'draw' && gameState.discardTop !== null
-              ? 'border-gold bg-card-white shadow-lg shadow-gold/20 hover:scale-105 active:scale-95 cursor-pointer'
-              : 'border-white/20 bg-card-white/90 cursor-default'
-          }`}
-        >
-          {gameState.discardTop !== null && (
-            <span
-              className={`text-2xl font-bold ${
-                gameState.discardTop < 0
-                  ? 'text-blue-600'
-                  : gameState.discardTop === 0
-                  ? 'text-yellow-600'
-                  : gameState.discardTop <= 4
-                  ? 'text-green-600'
-                  : gameState.discardTop <= 8
-                  ? 'text-orange-500'
-                  : 'text-red-600'
-              }`}
-            >
-              {gameState.discardTop}
-            </span>
+          <DiscardPile
+            topCard={gameState.discardTop}
+            active={isMyTurn && gameState.turnPhase === 'draw' && gameState.discardTop !== null}
+            onClick={handleDrawFromDiscard}
+          />
+
+          {gameState.drawnCard !== null && (
+            <DrawnCard
+              value={gameState.drawnCard}
+              onDiscard={handleDiscard}
+              canDiscard={isMyTurn && gameState.turnPhase === 'place_or_discard'}
+            />
           )}
-        </button>
+        </div>
 
-        {/* Drawn card */}
-        {gameState.drawnCard !== null && (
-          <div className="flex flex-col items-center gap-1">
-            <div className="w-16 h-24 rounded-xl bg-card-white border-2 border-gold flex items-center justify-center shadow-lg shadow-gold/30">
-              <span
-                className={`text-2xl font-bold ${
-                  gameState.drawnCard < 0
-                    ? 'text-blue-600'
-                    : gameState.drawnCard === 0
-                    ? 'text-yellow-600'
-                    : gameState.drawnCard <= 4
-                    ? 'text-green-600'
-                    : gameState.drawnCard <= 8
-                    ? 'text-orange-500'
-                    : 'text-red-600'
-                }`}
-              >
-                {gameState.drawnCard}
+        {/* Turn indicator */}
+        <TurnIndicator
+          text={getInstruction()}
+          isMyTurn={canInteract}
+          isFinalRound={gameState.phase === 'final_round'}
+          turnsLeft={gameState.finalRoundTurnsLeft}
+        />
+
+        {/* My hand */}
+        <div
+          ref={myHandRef}
+          className={`flex-none px-4 pb-4 pt-3 transition-all duration-300 ${
+            canInteract
+              ? 'bg-gradient-to-t from-gold/10 to-transparent border-t border-gold/20'
+              : 'border-t border-white/5'
+          }`}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">{me.avatar}</span>
+              <span className="text-white font-semibold text-sm">{me.nickname}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-sm font-mono font-bold ${me.score < 0 ? 'text-green-400' : me.score > 0 ? 'text-red-400' : 'text-white/50'}`}>
+                {me.score}
               </span>
             </div>
-            {isMyTurn && gameState.turnPhase === 'place_or_discard' && (
-              <button
-                onClick={handleDiscard}
-                className="text-xs text-white/50 hover:text-white/80 transition-colors"
-              >
-                Discard
-              </button>
-            )}
           </div>
-        )}
-      </div>
-
-      {/* Status bar */}
-      <div className="flex-none text-center py-1">
-        <span
-          className={`text-sm font-medium ${
-            isMyTurn || (gameState.phase === 'flipping_initial' && me.initialFlipsRemaining > 0)
-              ? 'text-gold'
-              : 'text-white/40'
-          }`}
-        >
-          {getInstruction()}
-        </span>
-        {gameState.phase === 'final_round' && (
-          <span className="text-orange-400 text-xs ml-2">
-            Final Round! ({gameState.finalRoundTurnsLeft} turns left)
-          </span>
-        )}
-      </div>
-
-      {/* My hand */}
-      <div
-        className={`flex-none px-4 pb-4 pt-2 ${
-          isMyTurn || (gameState.phase === 'flipping_initial' && me.initialFlipsRemaining > 0)
-            ? 'bg-gold/5 border-t border-gold/20'
-            : 'border-t border-white/5'
-        }`}
-      >
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <span className="text-lg">{me.avatar}</span>
-            <span className="text-white font-medium text-sm">{me.nickname}</span>
-          </div>
-          <span className="text-white/60 text-sm font-mono">Score: {me.score}</span>
+          <PlayerHand
+            cards={me.cards}
+            interactive={canInteract}
+            onCardClick={canInteract ? handleCardClick : undefined}
+            isDealing={isDealing}
+          />
         </div>
-        {renderCardGrid(
-          me.cards,
-          false,
-          isMyTurn || (gameState.phase === 'flipping_initial' && me.initialFlipsRemaining > 0)
-            ? handleCardClick
-            : undefined
-        )}
       </div>
     </div>
   );
