@@ -4,6 +4,7 @@ import { socket } from '../socket/client';
 import { useConnectionStore } from '../stores/connectionStore';
 import BackgroundArt from '../components/BackgroundArt';
 import RulesOverlay from '../components/RulesOverlay';
+import InstallButton from '../components/InstallButton';
 import { useStatsStore } from '../stores/statsStore';
 import { APP_VERSION } from '../version';
 
@@ -210,6 +211,9 @@ export default function HomeScreen() {
               >
                 Gegen Bots spielen
               </button>
+              <div className="pt-1">
+                <InstallButton />
+              </div>
             </div>
           )}
 
