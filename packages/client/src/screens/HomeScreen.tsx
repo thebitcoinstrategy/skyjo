@@ -20,7 +20,8 @@ export default function HomeScreen() {
     return AVATARS[Math.floor(Math.random() * AVATARS.length)];
   });
   const [roomCode, setRoomCode] = useState('');
-  const [mode, setMode] = useState<'menu' | 'join'>('menu');
+  const [mode, setMode] = useState<'menu' | 'join' | 'bots'>('menu');
+  const [botCount, setBotCount] = useState(3);
   const error = useConnectionStore((s) => s.error);
 
   const titleRef = useRef<HTMLDivElement>(null);
@@ -69,10 +70,10 @@ export default function HomeScreen() {
     });
   };
 
-  const handleSinglePlayer = () => {
+  const handleSinglePlayer = (count: number) => {
     if (!canSubmit) return;
     saveProfile();
-    socket.emit('start-single-player', { nickname: nickname.trim(), avatar, botCount: 3 });
+    socket.emit('start-single-player', { nickname: nickname.trim(), avatar, botCount: count });
   };
 
   const handleAvatarClick = (a: string, el: HTMLButtonElement) => {
@@ -151,7 +152,7 @@ export default function HomeScreen() {
             </div>
           )}
 
-          {mode === 'menu' ? (
+          {mode === 'menu' && (
             <div className="flex flex-col gap-2.5">
               <button
                 onClick={handleCreate}
@@ -168,14 +169,16 @@ export default function HomeScreen() {
                 Spiel beitreten
               </button>
               <button
-                onClick={handleSinglePlayer}
+                onClick={() => setMode('bots')}
                 disabled={!canSubmit}
                 className="w-full py-3 rounded-xl bg-transparent text-white/50 font-medium border border-white/8 hover:text-white/80 hover:border-white/20 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 Gegen Bots spielen
               </button>
             </div>
-          ) : (
+          )}
+
+          {mode === 'join' && (
             <div className="flex flex-col gap-2.5">
               <input
                 type="text"
@@ -192,6 +195,39 @@ export default function HomeScreen() {
                 className="w-full py-3.5 rounded-xl bg-gradient-to-r from-gold to-gold-dark text-felt-dark font-bold text-lg shadow-lg shadow-gold/20 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none"
               >
                 Beitreten
+              </button>
+              <button
+                onClick={() => setMode('menu')}
+                className="w-full py-2 text-white/30 text-sm hover:text-white/60 transition-colors"
+              >
+                Zurueck
+              </button>
+            </div>
+          )}
+
+          {mode === 'bots' && (
+            <div className="flex flex-col gap-2.5">
+              <p className="text-white/60 text-sm text-center mb-1">Anzahl Bots</p>
+              <div className="flex gap-2 justify-center mb-2">
+                {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setBotCount(n)}
+                    className={`w-10 h-10 rounded-xl text-lg font-bold transition-all active:scale-90 ${
+                      botCount === n
+                        ? 'bg-gold/30 text-gold ring-2 ring-gold/50 shadow-lg shadow-gold/20'
+                        : 'bg-white/8 text-white/50 hover:bg-white/15 hover:text-white/80'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => handleSinglePlayer(botCount)}
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-gold to-gold-dark text-felt-dark font-bold text-lg shadow-lg shadow-gold/20 hover:shadow-gold/40 active:scale-[0.97] transition-all"
+              >
+                Spiel starten
               </button>
               <button
                 onClick={() => setMode('menu')}

@@ -113,16 +113,26 @@ export class RoomManager {
 
     // Add bots
     const botCount = Math.max(1, Math.min(7, payload.botCount ?? 3));
-    const botNames = [
-      'Anna', 'Ben', 'Clara', 'David', 'Elena', 'Felix', 'Greta',
+    const allBotNames = [
+      'Anna', 'Ben', 'Clara', 'David', 'Elena', 'Felix', 'Greta', 'Hannah',
+      'Ida', 'Jan', 'Katja', 'Lukas', 'Mia', 'Nils', 'Olga', 'Paul',
+      'Romy', 'Stefan', 'Tina', 'Ulf', 'Vera', 'Werner', 'Xenia', 'Yara',
+      'Zoe', 'Fritz', 'Heidi', 'Moritz', 'Lena', 'Tobias', 'Sophie', 'Kai',
+      'Lotte', 'Rudi', 'Maja', 'Oskar', 'Pia', 'Lars', 'Emilia', 'Theo',
+      'Elsa', 'Hugo', 'Nora', 'Anton', 'Frieda', 'Erik', 'Klara', 'Otto',
+      'Rosa', 'Karl', 'Hilde', 'Gustav', 'Alma', 'Bruno', 'Marta', 'Willi',
+      'Liesel', 'Franz', 'Gerda', 'Heinz', 'Erna', 'Kurt', 'Trudi', 'Sepp',
     ];
+    // Shuffle and pick unique names
+    const shuffled = [...allBotNames].sort(() => Math.random() - 0.5);
+    const botEmojis = ['🤖', '🦊', '🐸', '🦁', '🐼', '🐱', '🐶'];
     for (let i = 0; i < botCount; i++) {
       const botId = `bot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       room.players.push({
         id: botId,
         socketId: '',
-        nickname: botNames[i % botNames.length],
-        avatar: '🤖',
+        nickname: shuffled[i % shuffled.length],
+        avatar: botEmojis[i % botEmojis.length],
         isHost: false,
         isBot: true,
       });
