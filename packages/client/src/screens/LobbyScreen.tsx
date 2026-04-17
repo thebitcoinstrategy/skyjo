@@ -61,10 +61,11 @@ export default function LobbyScreen() {
 
   const handleRemoveBot = (botId: string) => socket.emit('remove-bot', { botId });
 
-  const handleCopyCode = async () => {
+  const handleCopyLink = async () => {
     if (!roomCode) return;
     try {
-      await navigator.clipboard.writeText(roomCode);
+      const url = `${window.location.origin}?room=${roomCode}`;
+      await navigator.clipboard.writeText(url);
       setCopied(true);
       if (codeRef.current) {
         gsap.fromTo(codeRef.current, { scale: 1.1 }, { scale: 1, duration: 0.3, ease: 'back.out(2)' });
@@ -95,16 +96,16 @@ export default function LobbyScreen() {
           <p className="text-white/30 text-[10px] uppercase tracking-[0.3em] mb-2 font-medium">Raum-Code</p>
           <button
             ref={codeRef}
-            onClick={handleCopyCode}
+            onClick={handleCopyLink}
             className="text-5xl font-mono font-black text-gold tracking-[0.3em] hover:text-yellow-400 active:scale-95 transition-all"
           >
             {roomCode}
           </button>
           <p className="text-white/20 text-[11px] mt-1.5 transition-all">
             {copied ? (
-              <span className="text-green-400">Kopiert!</span>
+              <span className="text-green-400">Link kopiert!</span>
             ) : (
-              'Tippen zum Kopieren'
+              'Tippen zum Link kopieren'
             )}
           </p>
         </div>

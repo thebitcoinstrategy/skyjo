@@ -706,6 +706,12 @@ class SoundManagerClass {
     return tracks;
   }
 
+  changeTrack() {
+    const settings = useSettingsStore.getState();
+    if (!settings.musicEnabled || !this.music) return;
+    this.startMusic();
+  }
+
   stopMusic() {
     if (this.music) {
       this.music.stop();

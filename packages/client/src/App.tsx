@@ -27,9 +27,15 @@ export default function App() {
     }
   }, [screen]);
 
-  // Seed initial history entry on mount
+  // Seed initial history entry on mount; clear ?room= param so it doesn't persist
   useEffect(() => {
-    window.history.replaceState({ screen: 'home' }, '', '');
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('room')) {
+      url.searchParams.delete('room');
+      window.history.replaceState({ screen: 'home' }, '', url.pathname);
+    } else {
+      window.history.replaceState({ screen: 'home' }, '', '');
+    }
   }, []);
 
   // Handle browser back button

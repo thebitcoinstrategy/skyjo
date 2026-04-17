@@ -19,8 +19,14 @@ export default function HomeScreen() {
     } catch { /* ignore */ }
     return AVATARS[Math.floor(Math.random() * AVATARS.length)];
   });
-  const [roomCode, setRoomCode] = useState('');
-  const [mode, setMode] = useState<'menu' | 'join' | 'bots'>('menu');
+  const [roomCode, setRoomCode] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('room')?.toUpperCase() ?? '';
+  });
+  const [mode, setMode] = useState<'menu' | 'join' | 'bots'>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('room') ? 'join' : 'menu';
+  });
   const [botCount, setBotCount] = useState(3);
   const error = useConnectionStore((s) => s.error);
 

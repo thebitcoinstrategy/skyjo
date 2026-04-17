@@ -118,14 +118,6 @@ export default function Card({
         '-=0.05'
       );
 
-      // Gold flash on flip
-      tl.fromTo(
-        containerRef.current,
-        { boxShadow: '0 0 12px 4px rgba(245,193,108,0.7)' },
-        { boxShadow: '0 0 0px 0px rgba(245,193,108,0)', duration: 0.4, ease: 'power2.out' },
-        '-=0.25'
-      );
-
       tl.to(
         containerRef.current,
         {

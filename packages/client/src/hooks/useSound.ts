@@ -45,6 +45,17 @@ export function useSound() {
   // Sounds are now triggered from the animation handler in GameScreen
   // (synchronized with the visual animations instead of firing immediately on queue push)
 
+  // Change music track when a new round starts
+  useEffect(() => {
+    if (!gameState || !prevState.current) return;
+    const prevPhase = prevState.current.phase;
+    const currPhase = gameState.phase;
+    // New round: transition from round_over back to flipping_initial
+    if (prevPhase === 'round_over' && currPhase === 'flipping_initial') {
+      soundManager.changeTrack();
+    }
+  }, [gameState]);
+
   // Play turn notification and announce player name via TTS
   useEffect(() => {
     if (!gameState || !playerId || !prevState.current) {
