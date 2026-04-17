@@ -14,6 +14,9 @@ export type SoundEffect =
   | 'column-eliminate'
   | 'win-fanfare'
   | 'lose-sound'
+  | 'closer-win'
+  | 'closer-lose'
+  | 'card-count-tick'
   | 'button-click'
   | 'error';
 
@@ -67,6 +70,12 @@ class SoundManagerClass {
     this.sfxSounds.set('win-fanfare', this.createChimeHowl([523, 659, 784, 1046, 1318], 0.6, 0.4));
     // Lose
     this.sfxSounds.set('lose-sound', this.createToneHowl(165, 0.4, 'sawtooth', 0.2));
+    // Closer wins — triumphant brass fanfare with sparkle
+    this.sfxSounds.set('closer-win', this.createCloserWinHowl());
+    // Closer loses — sad trombone wah-wah
+    this.sfxSounds.set('closer-lose', this.createCloserLoseHowl());
+    // Card count tick — short pop for each card revealed
+    this.sfxSounds.set('card-count-tick', this.createSwooshHowl(0.06, 1200, 4000, 0.15));
     // Button click - soft tap
     this.sfxSounds.set('button-click', this.createSwooshHowl(0.04, 2000, 5000, 0.12));
     // Error
@@ -704,6 +713,134 @@ class SoundManagerClass {
     ];
 
     return tracks;
+  }
+
+  /**
+   * Closer wins: triumphant brass fanfare — ascending C major arpeggio
+   * with bright harmonics and sparkle cascade.
+   */
+  private createCloserWinHowl(): Howl {
+    const sampleRate = 44100;
+    const duration = 2.5;
+    const numSamples = Math.floor(sampleRate * duration);
+    const buffer = new ArrayBuffer(44 + numSamples * 2);
+    const view = new DataView(buffer);
+    this.writeWavHeader(view, numSamples, sampleRate);
+
+    const notes = [
+      { freq: 261.63, start: 0.0, dur: 0.4 },   // C4
+      { freq: 329.63, start: 0.12, dur: 0.4 },  // E4
+      { freq: 392.00, start: 0.24, dur: 0.4 },  // G4
+      { freq: 523.25, start: 0.36, dur: 0.5 },  // C5
+      { freq: 659.25, start: 0.50, dur: 0.5 },  // E5
+      { freq: 783.99, start: 0.65, dur: 0.6 },  // G5
+      { freq: 1046.50, start: 0.80, dur: 0.9 }, // C6 — sustained top note
+    ];
+
+    let prev = 0;
+    for (let i = 0; i < numSamples; i++) {
+      const t = i / sampleRate;
+      let sample = 0;
+
+      // Bass boom
+      const boomFreq = 65 * Math.exp(-t * 2);
+      sample += Math.sin(2 * Math.PI * boomFreq * t) * Math.exp(-t * 3) * 0.15;
+
+      // Arpeggio
+      for (const n of notes) {
+        if (t >= n.start && t < n.start + n.dur) {
+          const localT = (t - n.start) / n.dur;
+          const env = Math.sin(localT * Math.PI) * Math.exp(-localT * 1.5) * 0.12;
+          sample += Math.sin(2 * Math.PI * n.freq * t) * env;
+          sample += Math.sin(2 * Math.PI * n.freq * 2 * t) * env * 0.3;
+          sample += Math.sin(2 * Math.PI * n.freq * 3 * t) * env * 0.1;
+        }
+      }
+
+      // Sparkle cascade
+      for (let s = 0; s < 12; s++) {
+        const sStart = 0.3 + s * 0.12;
+        const sFreq = 2000 + s * 350 + Math.sin(s * 2.7) * 200;
+        if (t >= sStart && t < sStart + 0.15) {
+          const sT = (t - sStart) / 0.15;
+          sample += Math.sin(2 * Math.PI * sFreq * t) * Math.exp(-sT * 5) * 0.04;
+        }
+      }
+
+      // Shimmer tail
+      const noise = Math.random() * 2 - 1;
+      const alpha = 0.04;
+      prev = prev * (1 - alpha) + noise * alpha;
+      if (t > 0.5) {
+        const shimmerEnv = Math.exp(-(t - 0.5) * 2) * 0.06;
+        sample += prev * shimmerEnv;
+      }
+
+      // Sustained chord tail
+      if (t > 1.2) {
+        const tailEnv = Math.exp(-(t - 1.2) * 2) * 0.06;
+        sample += (Math.sin(2 * Math.PI * 523.25 * t) + Math.sin(2 * Math.PI * 659.25 * t) + Math.sin(2 * Math.PI * 783.99 * t)) * tailEnv;
+      }
+
+      const value = Math.max(-32768, Math.min(32767, Math.floor(sample * 32767)));
+      view.setInt16(44 + i * 2, value, true);
+    }
+
+    return this.makeBlobHowl(view);
+  }
+
+  /**
+   * Closer loses: sad trombone wah-wah — descending pitches with wobble.
+   */
+  private createCloserLoseHowl(): Howl {
+    const sampleRate = 44100;
+    const duration = 2.0;
+    const numSamples = Math.floor(sampleRate * duration);
+    const buffer = new ArrayBuffer(44 + numSamples * 2);
+    const view = new DataView(buffer);
+    this.writeWavHeader(view, numSamples, sampleRate);
+
+    const notes = [
+      { freq: 392.00, start: 0.0, dur: 0.35 },  // G4
+      { freq: 349.23, start: 0.35, dur: 0.35 }, // F4
+      { freq: 329.63, start: 0.70, dur: 0.35 }, // E4
+      { freq: 261.63, start: 1.05, dur: 0.8 },  // C4 — long final note with wobble
+    ];
+
+    for (let i = 0; i < numSamples; i++) {
+      const t = i / sampleRate;
+      let sample = 0;
+
+      for (const n of notes) {
+        if (t >= n.start && t < n.start + n.dur) {
+          const localT = (t - n.start) / n.dur;
+          const env = (1 - localT * 0.3) * Math.exp(-localT * 1.2) * 0.18;
+
+          // Wah-wah wobble (vibrato + amplitude modulation)
+          const vibrato = Math.sin(2 * Math.PI * 5 * t) * 8;
+          const wahMod = 0.7 + 0.3 * Math.sin(2 * Math.PI * 4 * t);
+          const freq = n.freq + vibrato;
+
+          // Sawtooth-ish trombone timbre
+          sample += (Math.sin(2 * Math.PI * freq * t) * 0.6
+            + Math.sin(2 * Math.PI * freq * 2 * t) * 0.25
+            + Math.sin(2 * Math.PI * freq * 3 * t) * 0.1) * env * wahMod;
+        }
+      }
+
+      // Descending pitch slide on the final note
+      if (t > 1.5) {
+        const slideT = (t - 1.5) / 0.5;
+        const slideFreq = 261.63 * Math.pow(0.7, slideT);
+        const slideEnv = Math.exp(-slideT * 3) * 0.12;
+        sample += Math.sin(2 * Math.PI * slideFreq * t) * slideEnv;
+      }
+
+      const value = Math.max(-32768, Math.min(32767, Math.floor(sample * 32767)));
+      view.setInt16(44 + i * 2, value, true);
+    }
+
+    return this.makeBlobHowl(view);
   }
 
   changeTrack() {

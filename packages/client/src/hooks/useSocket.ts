@@ -79,6 +79,7 @@ export function useSocket() {
       console.log('[socket] Rejoined room:', payload.roomCode);
       setPlayerId(payload.playerId);
       setRoomCode(payload.roomCode);
+      setLobby(payload.lobby);
       setGameState(payload.gameState);
       setScreen('game');
       setError(null);

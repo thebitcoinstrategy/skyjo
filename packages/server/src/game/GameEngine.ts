@@ -296,10 +296,21 @@ export class GameEngine {
 
   getRoundScores(): RoundEndPayload {
     const triggerIdx = this.state.triggeringPlayerIndex ?? 0;
+    const closerPlayer = this.state.players[triggerIdx];
     const roundScores = calculateRoundScores(this.state.players, triggerIdx);
 
     const roundScoresMap: Record<string, number> = {};
     const totalScoresMap: Record<string, number> = {};
+    const playerCards: Record<string, number[]> = {};
+
+    // Capture card values before scoring
+    this.state.players.forEach((p) => {
+      playerCards[p.id] = p.cards.map((c) => c.value);
+    });
+
+    // Detect if doubling happened
+    const rawScores = this.state.players.map((p) => calculateTotalScore(p.cards));
+    const wasDoubled = roundScores[triggerIdx] !== rawScores[triggerIdx];
 
     this.state.players.forEach((p, i) => {
       p.roundScores.push(roundScores[i]);
@@ -318,6 +329,9 @@ export class GameEngine {
       roundScores: roundScoresMap,
       totalScores: totalScoresMap,
       roundNumber: this.state.roundNumber,
+      closerPlayerId: closerPlayer.id,
+      wasDoubled,
+      playerCards,
     };
   }
 

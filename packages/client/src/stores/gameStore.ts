@@ -11,6 +11,9 @@ interface GameStoreState {
   pendingGameState: VisibleGameState | null;
   animating: boolean;
 
+  // Scoring animation: true after the counting animation completes
+  scoringDone: boolean;
+
   setGameState: (state: VisibleGameState) => void;
   pushAnimation: (event: AnimationEventPayload) => void;
   shiftAnimation: () => AnimationEventPayload | undefined;
@@ -18,6 +21,7 @@ interface GameStoreState {
   flushPending: () => void;
   setRoundEndData: (data: RoundEndPayload | null) => void;
   setGameEndData: (data: GameEndPayload | null) => void;
+  setScoringDone: (done: boolean) => void;
   reset: () => void;
 }
 
@@ -28,6 +32,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   gameEndData: null,
   pendingGameState: null,
   animating: false,
+  scoringDone: false,
 
   setGameState: (gameState) => {
     if (get().animating) {
@@ -62,8 +67,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       set({ gameState: pending, pendingGameState: null });
     }
   },
-  setRoundEndData: (roundEndData) => set({ roundEndData }),
+  setRoundEndData: (roundEndData) => set({ roundEndData, scoringDone: false }),
   setGameEndData: (gameEndData) => set({ gameEndData }),
+  setScoringDone: (scoringDone) => set({ scoringDone }),
   reset: () =>
     set({
       gameState: null,
@@ -72,5 +78,6 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       gameEndData: null,
       pendingGameState: null,
       animating: false,
+      scoringDone: false,
     }),
 }));

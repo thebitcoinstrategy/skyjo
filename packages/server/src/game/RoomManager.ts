@@ -510,8 +510,17 @@ export class RoomManager {
     socket: Socket<ClientEvents, ServerEvents>
   ): void {
     const room = this.getRoom(socket);
-    if (!room?.engine) return;
+    if (!room) {
+      log('???', `play-again: no room found for socket ${socket.id}`);
+      socket.emit('error', { message: 'Raum nicht gefunden' });
+      return;
+    }
+    if (!room.engine) {
+      log(room.code, `play-again: no engine`);
+      return;
+    }
     const pid = this.getPlayerId(socket);
+    log(room.code, `play-again requested by ${pid} (host=${room.hostId})`);
 
     if (room.hostId !== pid) {
       socket.emit('error', { message: 'Only the host can start a new game' });
@@ -519,6 +528,7 @@ export class RoomManager {
     }
 
     room.engine.startRound();
+    log(room.code, `New round ${room.engine.state.roundNumber} started, phase=${room.engine.state.phase}`);
     this.broadcastGameState(io, room);
     this.processBotTurns(io, room);
   }
@@ -623,12 +633,13 @@ export class RoomManager {
         enginePlayer.connected = true;
       }
 
-      // Send current game state
+      // Send current game state + lobby data
       const visibleState = room.engine.getVisibleState(payload.playerId);
       socket.emit('rejoined', {
         roomCode: room.code,
         playerId: payload.playerId,
         gameState: visibleState,
+        lobby: this.getLobbyPlayers(room),
       });
     } else {
       // Game hasn't started yet — rejoin lobby

@@ -7,12 +7,15 @@ import { socket } from './socket/client';
 import HomeScreen from './screens/HomeScreen';
 import LobbyScreen from './screens/LobbyScreen';
 import GameScreen from './screens/GameScreen';
+import RoundScoringScreen from './screens/RoundScoringScreen';
 import ResultsScreen from './screens/ResultsScreen';
 import AudioControls from './components/AudioControls';
 
 export default function App() {
   const screen = useConnectionStore((s) => s.screen);
   const gamePhase = useGameStore((s) => s.gameState?.phase);
+  const scoringDone = useGameStore((s) => s.scoringDone);
+  const roundEndData = useGameStore((s) => s.roundEndData);
   const prevScreen = useRef(screen);
 
   useSocket();
@@ -72,6 +75,10 @@ export default function App() {
     if (screen === 'lobby') return <LobbyScreen />;
     if (screen === 'game') {
       if (gamePhase === 'round_over' || gamePhase === 'game_over') {
+        // Show counting animation first, then results
+        if (!scoringDone && roundEndData) {
+          return <RoundScoringScreen />;
+        }
         return <ResultsScreen />;
       }
       return <GameScreen />;

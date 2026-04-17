@@ -82,6 +82,7 @@ export default function ResultsScreen() {
           {sortedPlayers.map((player, rank) => {
             const roundScore = roundEndData?.roundScores[player.id];
             const isMe = player.id === playerId;
+            const isCloser = player.id === roundEndData?.closerPlayerId;
             return (
               <div
                 key={player.id}
@@ -101,6 +102,11 @@ export default function ResultsScreen() {
                   <span className={`font-semibold text-sm ${isMe ? 'text-gold' : 'text-white/90'}`}>
                     {player.nickname}
                   </span>
+                  {isCloser && (
+                    <span className={`text-[9px] ml-1 ${roundEndData?.wasDoubled ? 'text-red-400' : 'text-green-400'}`}>
+                      {roundEndData?.wasDoubled ? '×2' : '★'}
+                    </span>
+                  )}
                   {roundScore !== undefined && (
                     <span
                       className={`text-[11px] ml-2 font-mono ${

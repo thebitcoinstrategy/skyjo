@@ -87,6 +87,7 @@ export interface RejoinedPayload {
   roomCode: string;
   playerId: string;
   gameState: VisibleGameState;
+  lobby: LobbyPlayer[];
 }
 
 export interface PlayerJoinedPayload {
@@ -118,6 +119,10 @@ export interface RoundEndPayload {
   roundScores: Record<string, number>;
   totalScores: Record<string, number>;
   roundNumber: number;
+  closerPlayerId: string;
+  wasDoubled: boolean;
+  /** All card values per player at round end (for counting animation) */
+  playerCards: Record<string, number[]>;
 }
 
 export interface GameEndPayload {
