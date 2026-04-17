@@ -92,16 +92,16 @@ const FlyingCard = forwardRef<HTMLDivElement, {
         left: endX - endOffsetX,
         top: endY - endOffsetY,
         scale: endScale,
-        duration: 0.4,
-        ease: 'power3.out',
+        duration: 0.35,
+        ease: 'power2.inOut',
       }
     );
-    // Quick fade at destination
+    // Fade overlaps with the end of the movement (starts at 75% through)
     tl.to(innerRef.current, {
       opacity: 0,
-      duration: 0.1,
+      duration: 0.12,
       ease: 'power2.in',
-    });
+    }, '-=0.12');
   }, [startX, startY, endX, endY, endScale, endOffsetX, endOffsetY, onDone]);
 
   return (
@@ -109,7 +109,7 @@ const FlyingCard = forwardRef<HTMLDivElement, {
       <div
         ref={innerRef}
         className="fixed w-[3.2rem] h-[4.2rem] rounded-md overflow-hidden shadow-2xl ring-2 ring-gold/80 pointer-events-none z-50"
-        style={{ left: startX - 26, top: startY - 34 }}
+        style={{ left: startX - 26, top: startY - 34, willChange: 'transform, opacity' }}
       >
         <div className={`absolute inset-0 bg-gradient-to-br ${getStyle(value)}`} />
         <div className="absolute inset-[1px] rounded-sm border border-white/25" />
@@ -213,7 +213,7 @@ const DisplacedCard = forwardRef<HTMLDivElement, {
       <div
         ref={containerRef}
         className="fixed w-[3.2rem] h-[4.2rem] pointer-events-none z-50"
-        style={{ left: startX - 26, top: startY - 34, scale: startScale, perspective: '600px' }}
+        style={{ left: startX - 26, top: startY - 34, scale: startScale, perspective: '600px', willChange: 'transform, opacity' }}
       >
         <div
           ref={flipInnerRef}
@@ -1026,8 +1026,8 @@ export default function GameScreen() {
 
       {/* ═══ CONTENT ═══ */}
       <div className="relative z-10 h-full flex flex-col">
-        {/* Opponents area — no scrolling, cards auto-shrink */}
-        <div className="flex-none px-1.5 pt-1 pb-0.5">
+        {/* Opponents area — scrollable when too many opponents */}
+        <div className="shrink overflow-y-auto min-h-0 px-1.5 pt-1 pb-0.5" style={{ maxHeight: '35vh' }}>
           <div className="flex gap-1 flex-wrap justify-center">
             {opponents.map((opp) => {
               const oppIndex = gameState.players.findIndex((p) => p.id === opp.id);
@@ -1070,7 +1070,7 @@ export default function GameScreen() {
         </div>
 
         {/* Center area — piles + held card */}
-        <div className="flex-1 flex flex-col items-center justify-center px-3 relative">
+        <div className="flex-1 min-h-0 flex flex-col items-center justify-center px-3 relative">
           {/* Piles row */}
           <div className="flex items-center justify-center gap-4">
             <div
