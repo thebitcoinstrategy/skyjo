@@ -382,6 +382,69 @@ export default function GameScreen() {
   const flyingCardRef = useRef<HTMLDivElement>(null);
   const flyingCardResolveRef = useRef<(() => void) | null>(null);
 
+  // ── Round-end card reveal: stagger-flip face-down cards one by one ──
+  const revealingCards = useGameStore((s) => s.revealingCards);
+  const preRevealSnapshot = useGameStore((s) => s.preRevealSnapshot);
+  const setRevealingCards = useGameStore((s) => s.setRevealingCards);
+  const [revealedSet, setRevealedSet] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!revealingCards || !preRevealSnapshot || !gameState) return;
+
+    // Build list of all face-down cards: { playerId, cardIndex }
+    const toReveal: { pid: string; idx: number }[] = [];
+    for (const player of gameState.players) {
+      const snapshot = preRevealSnapshot[player.id];
+      if (!snapshot) continue;
+      for (let i = 0; i < snapshot.length; i++) {
+        if (snapshot[i]) toReveal.push({ pid: player.id, idx: i });
+      }
+    }
+
+    if (toReveal.length === 0) {
+      setRevealingCards(false);
+      return;
+    }
+
+    // Stagger reveal with 150ms between each card
+    const delay = 200; // initial pause
+    const interval = 150;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    toReveal.forEach((item, i) => {
+      timers.push(setTimeout(() => {
+        setRevealedSet((prev) => {
+          const next = new Set(prev);
+          next.add(`${item.pid}:${item.idx}`);
+          return next;
+        });
+        soundManager.play('card-flip');
+      }, delay + i * interval));
+    });
+
+    // After all revealed, transition to scoring screen
+    timers.push(setTimeout(() => {
+      setRevealingCards(false);
+      setRevealedSet(new Set());
+    }, delay + toReveal.length * interval + 600));
+
+    return () => timers.forEach(clearTimeout);
+  }, [revealingCards, preRevealSnapshot, gameState, setRevealingCards]);
+
+  // Override cards during round-end reveal: keep face-down cards hidden until stagger timer reveals them
+  const getRevealCards = useCallback((playerId: string, cards: import('@skyjo/shared').VisibleCardSlot[]) => {
+    if (!revealingCards || !preRevealSnapshot) return cards;
+    const snapshot = preRevealSnapshot[playerId];
+    if (!snapshot) return cards;
+    return cards.map((card, i) => {
+      if (snapshot[i] && !revealedSet.has(`${playerId}:${i}`)) {
+        // This card was face-down and hasn't been revealed yet — keep it face-down
+        return { ...card, faceUp: false };
+      }
+      return card;
+    });
+  }, [revealingCards, preRevealSnapshot, revealedSet]);
+
   // Ref for canPlaceCard — must be declared here (before early return) to satisfy hooks rules
   const canPlaceRef = useRef(false);
 
@@ -1061,7 +1124,7 @@ export default function GameScreen() {
                         {opp.score}
                       </span>
                     </div>
-                    <PlayerHand cards={opp.cards} tiny skipFlipForIndex={oppPlacedCards[opp.id] ?? null} />
+                    <PlayerHand cards={getRevealCards(opp.id, opp.cards)} tiny skipFlipForIndex={oppPlacedCards[opp.id] ?? null} />
                   </div>
                 </div>
               );
@@ -1150,7 +1213,7 @@ export default function GameScreen() {
             </span>
           </div>
           <PlayerHand
-            cards={me.cards}
+            cards={getRevealCards(me.id, me.cards)}
             interactive={canInteract}
             onCardClick={canInteract ? handleCardClick : undefined}
             isDealing={isDealing}

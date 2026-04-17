@@ -16,6 +16,7 @@ export default function App() {
   const gamePhase = useGameStore((s) => s.gameState?.phase);
   const scoringDone = useGameStore((s) => s.scoringDone);
   const roundEndData = useGameStore((s) => s.roundEndData);
+  const revealingCards = useGameStore((s) => s.revealingCards);
   const prevScreen = useRef(screen);
 
   useSocket();
@@ -75,6 +76,10 @@ export default function App() {
     if (screen === 'lobby') return <LobbyScreen />;
     if (screen === 'game') {
       if (gamePhase === 'round_over' || gamePhase === 'game_over') {
+        // Keep GameScreen visible while cards flip one by one at round end
+        if (revealingCards) {
+          return <GameScreen />;
+        }
         // Show counting animation first, then results
         if (!scoringDone && roundEndData) {
           return <RoundScoringScreen />;
