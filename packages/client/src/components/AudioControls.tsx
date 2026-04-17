@@ -9,7 +9,7 @@ export default function AudioControls() {
   const toggleReduceAnimations = useSettingsStore((s) => s.toggleReduceAnimations);
 
   return (
-    <div className="fixed top-2 right-2 z-50 flex gap-1.5">
+    <div className="fixed top-8 left-2 z-50 flex flex-col gap-1.5">
       <button
         onClick={toggleMusic}
         className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all ${
