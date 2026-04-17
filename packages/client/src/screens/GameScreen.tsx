@@ -307,6 +307,7 @@ CelebrationOverlay.displayName = 'CelebrationOverlay';
 export default function GameScreen() {
   const gameState = useGameStore((s) => s.gameState);
   const playerId = useConnectionStore((s) => s.playerId);
+  const connected = useConnectionStore((s) => s.connected);
   const [isDealing] = useState(true);
   const myHandRef = useRef<HTMLDivElement>(null);
   const drawPileRef = useRef<HTMLDivElement>(null);
@@ -939,6 +940,14 @@ export default function GameScreen() {
       />
       <BackgroundArt variant="game" />
       <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-gold/20 to-transparent" />
+
+      {/* ═══ CONNECTION STATUS ═══ */}
+      <div className="absolute top-1.5 left-2 z-30 flex items-center gap-1.5">
+        <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`} />
+        {!connected && (
+          <span className="text-red-400 text-[10px] font-medium">Verbindung unterbrochen...</span>
+        )}
+      </div>
 
       {/* ═══ SCREEN FLASH (column eliminate) ═══ */}
       {screenFlash && (

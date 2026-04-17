@@ -3,6 +3,30 @@ import { socket } from '../socket/client';
 import { useConnectionStore } from '../stores/connectionStore';
 import { useGameStore } from '../stores/gameStore';
 
+// Persist session info for reconnection
+function saveSession(playerId: string, roomCode: string) {
+  try {
+    sessionStorage.setItem('skyjo_playerId', playerId);
+    sessionStorage.setItem('skyjo_roomCode', roomCode);
+  } catch { /* ignore */ }
+}
+
+function clearSession() {
+  try {
+    sessionStorage.removeItem('skyjo_playerId');
+    sessionStorage.removeItem('skyjo_roomCode');
+  } catch { /* ignore */ }
+}
+
+function getSession(): { playerId: string; roomCode: string } | null {
+  try {
+    const playerId = sessionStorage.getItem('skyjo_playerId');
+    const roomCode = sessionStorage.getItem('skyjo_roomCode');
+    if (playerId && roomCode) return { playerId, roomCode };
+  } catch { /* ignore */ }
+  return null;
+}
+
 export function useSocket() {
   const setConnected = useConnectionStore((s) => s.setConnected);
   const setScreen = useConnectionStore((s) => s.setScreen);
@@ -19,7 +43,18 @@ export function useSocket() {
   useEffect(() => {
     socket.connect();
 
-    socket.on('connect', () => setConnected(true));
+    socket.on('connect', () => {
+      setConnected(true);
+
+      // Attempt rejoin if we have a saved session and we're not on home screen
+      const session = getSession();
+      const currentScreen = useConnectionStore.getState().screen;
+      if (session && currentScreen !== 'home') {
+        console.log('[socket] Attempting rejoin:', session);
+        socket.emit('rejoin-room', session);
+      }
+    });
+
     socket.on('disconnect', () => setConnected(false));
 
     socket.on('room-created', (payload) => {
@@ -28,6 +63,7 @@ export function useSocket() {
       setLobby(payload.lobby);
       setScreen('lobby');
       setError(null);
+      saveSession(payload.playerId, payload.roomCode);
     });
 
     socket.on('room-joined', (payload) => {
@@ -36,6 +72,17 @@ export function useSocket() {
       setLobby(payload.lobby);
       setScreen('lobby');
       setError(null);
+      saveSession(payload.playerId, payload.roomCode);
+    });
+
+    socket.on('rejoined', (payload) => {
+      console.log('[socket] Rejoined room:', payload.roomCode);
+      setPlayerId(payload.playerId);
+      setRoomCode(payload.roomCode);
+      setGameState(payload.gameState);
+      setScreen('game');
+      setError(null);
+      saveSession(payload.playerId, payload.roomCode);
     });
 
     socket.on('player-joined', (payload) => {
@@ -57,6 +104,9 @@ export function useSocket() {
     socket.on('game-started', (state) => {
       setGameState(state);
       setScreen('game');
+      // Save session when game starts (playerId was set during room creation/join)
+      const { playerId, roomCode } = useConnectionStore.getState();
+      if (playerId && roomCode) saveSession(playerId, roomCode);
     });
 
     socket.on('game-state-update', (state) => {
@@ -87,5 +137,15 @@ export function useSocket() {
       socket.removeAllListeners();
       socket.disconnect();
     };
+  }, []);
+
+  // Clear session when user goes back to home screen
+  useEffect(() => {
+    const unsub = useConnectionStore.subscribe((state) => {
+      if (state.screen === 'home') {
+        clearSession();
+      }
+    });
+    return unsub;
   }, []);
 }

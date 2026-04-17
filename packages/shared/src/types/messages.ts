@@ -39,9 +39,15 @@ export interface StartSinglePlayerPayload {
   botCount?: number;
 }
 
+export interface RejoinRoomPayload {
+  playerId: string;
+  roomCode: string;
+}
+
 export interface ClientEvents {
   'create-room': (payload: CreateRoomPayload) => void;
   'join-room': (payload: JoinRoomPayload) => void;
+  'rejoin-room': (payload: RejoinRoomPayload) => void;
   'start-game': () => void;
   'start-single-player': (payload: StartSinglePlayerPayload) => void;
   'flip-initial-card': (payload: FlipInitialCardPayload) => void;
@@ -75,6 +81,12 @@ export interface RoomJoinedPayload {
   roomCode: string;
   playerId: string;
   lobby: LobbyPlayer[];
+}
+
+export interface RejoinedPayload {
+  roomCode: string;
+  playerId: string;
+  gameState: VisibleGameState;
 }
 
 export interface PlayerJoinedPayload {
@@ -120,6 +132,7 @@ export interface ErrorPayload {
 export interface ServerEvents {
   'room-created': (payload: RoomCreatedPayload) => void;
   'room-joined': (payload: RoomJoinedPayload) => void;
+  'rejoined': (payload: RejoinedPayload) => void;
   'player-joined': (payload: PlayerJoinedPayload) => void;
   'player-left': (payload: PlayerLeftPayload) => void;
   'game-started': (payload: VisibleGameState) => void;

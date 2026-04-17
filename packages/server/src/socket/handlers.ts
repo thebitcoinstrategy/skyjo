@@ -18,6 +18,10 @@ export function registerSocketHandlers(
       roomManager.joinRoom(io, socket, payload);
     });
 
+    socket.on('rejoin-room', (payload) => {
+      roomManager.rejoinRoom(io, socket, payload);
+    });
+
     socket.on('start-game', () => {
       roomManager.startGame(io, socket);
     });

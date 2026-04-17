@@ -1,4 +1,5 @@
 import { Server, Socket } from 'socket.io';
+import crypto from 'crypto';
 import type {
   ClientEvents,
   ServerEvents,
@@ -23,9 +24,13 @@ function log(room: string, ...args: unknown[]) {
   console.log(`[${ts}] [${room}]`, ...args);
 }
 
+function generatePlayerId(): string {
+  return crypto.randomUUID();
+}
+
 interface RoomPlayer {
-  id: string;
-  socketId: string;
+  id: string;       // Stable UUID (persists across reconnects)
+  socketId: string;  // Current socket.id (changes on reconnect)
   nickname: string;
   avatar: string;
   isHost: boolean;
@@ -36,12 +41,15 @@ interface Room {
   code: string;
   players: RoomPlayer[];
   engine: GameEngine | null;
-  hostId: string;
+  hostId: string;  // Now stores the stable playerId, not socket.id
   botDifficulty: BotDifficulty;
+  cleanupTimer?: ReturnType<typeof setTimeout>;
 }
 
-// Map socketId -> roomCode
+// Map socketId -> roomCode (for quick room lookup from socket)
 const socketRoomMap = new Map<string, string>();
+// Map socketId -> stable playerId
+const socketToPlayer = new Map<string, string>();
 
 export class RoomManager {
   private rooms = new Map<string, Room>();
@@ -53,7 +61,7 @@ export class RoomManager {
     payload: CreateRoomPayload
   ): void {
     const code = generateRoomCode(this.roomCodes);
-    const playerId = socket.id;
+    const playerId = generatePlayerId();
 
     const player: RoomPlayer = {
       id: playerId,
@@ -75,6 +83,7 @@ export class RoomManager {
     this.rooms.set(code, room);
     this.roomCodes.add(code);
     socketRoomMap.set(socket.id, code);
+    socketToPlayer.set(socket.id, playerId);
 
     socket.join(code);
 
@@ -92,7 +101,7 @@ export class RoomManager {
   ): void {
     // Create room
     const code = generateRoomCode(this.roomCodes);
-    const playerId = socket.id;
+    const playerId = generatePlayerId();
 
     const player: RoomPlayer = {
       id: playerId,
@@ -141,6 +150,7 @@ export class RoomManager {
     this.rooms.set(code, room);
     this.roomCodes.add(code);
     socketRoomMap.set(socket.id, code);
+    socketToPlayer.set(socket.id, playerId);
     socket.join(code);
 
     // Start the game immediately
@@ -189,7 +199,7 @@ export class RoomManager {
       return;
     }
 
-    const playerId = socket.id;
+    const playerId = generatePlayerId();
     const player: RoomPlayer = {
       id: playerId,
       socketId: socket.id,
@@ -201,6 +211,7 @@ export class RoomManager {
 
     room.players.push(player);
     socketRoomMap.set(socket.id, room.code);
+    socketToPlayer.set(socket.id, playerId);
 
     socket.join(room.code);
 
@@ -222,8 +233,9 @@ export class RoomManager {
   ): void {
     const room = this.getRoom(socket);
     if (!room) return;
+    const pid = this.getPlayerId(socket);
 
-    if (room.hostId !== socket.id) {
+    if (room.hostId !== pid) {
       socket.emit('error', { message: 'Only the host can start the game' });
       return;
     }
@@ -259,8 +271,10 @@ export class RoomManager {
   ): void {
     const room = this.getRoom(socket);
     if (!room?.engine) return;
+    const pid = this.getPlayerId(socket);
+    if (!pid) return;
 
-    const result = room.engine.flipInitialCard(socket.id, payload.cardIndex);
+    const result = room.engine.flipInitialCard(pid, payload.cardIndex);
     if (!result.ok) {
       socket.emit('error', { message: result.error });
       return;
@@ -269,7 +283,7 @@ export class RoomManager {
     // Broadcast animation event
     io.to(room.code).emit('animation-event', {
       type: 'flip-card',
-      playerId: socket.id,
+      playerId: pid,
       data: { cardIndex: payload.cardIndex },
     });
 
@@ -292,8 +306,10 @@ export class RoomManager {
   ): void {
     const room = this.getRoom(socket);
     if (!room?.engine) return;
+    const pid = this.getPlayerId(socket);
+    if (!pid) return;
 
-    const result = room.engine.drawFromPile(socket.id);
+    const result = room.engine.drawFromPile(pid);
     if (!result.ok) {
       log(room.code, `Human drawFromPile FAILED: ${result.error}`);
       socket.emit('error', { message: result.error });
@@ -303,7 +319,7 @@ export class RoomManager {
 
     io.to(room.code).emit('animation-event', {
       type: 'draw-from-pile',
-      playerId: socket.id,
+      playerId: pid,
       data: { value: room.engine.state.drawnCard },
     });
 
@@ -316,8 +332,10 @@ export class RoomManager {
   ): void {
     const room = this.getRoom(socket);
     if (!room?.engine) return;
+    const pid = this.getPlayerId(socket);
+    if (!pid) return;
 
-    const result = room.engine.drawFromDiscard(socket.id);
+    const result = room.engine.drawFromDiscard(pid);
     if (!result.ok) {
       log(room.code, `Human drawFromDiscard FAILED: ${result.error}`);
       socket.emit('error', { message: result.error });
@@ -327,7 +345,7 @@ export class RoomManager {
 
     io.to(room.code).emit('animation-event', {
       type: 'draw-from-discard',
-      playerId: socket.id,
+      playerId: pid,
       data: { value: room.engine.state.drawnCard },
     });
 
@@ -341,8 +359,10 @@ export class RoomManager {
   ): void {
     const room = this.getRoom(socket);
     if (!room?.engine) return;
+    const pid = this.getPlayerId(socket);
+    if (!pid) return;
 
-    const result = room.engine.placeDrawnCard(socket.id, payload.cardIndex);
+    const result = room.engine.placeDrawnCard(pid, payload.cardIndex);
     if (!result.ok) {
       log(room.code, `Human placeDrawnCard FAILED: ${result.error}`);
       socket.emit('error', { message: result.error });
@@ -352,14 +372,14 @@ export class RoomManager {
 
     io.to(room.code).emit('animation-event', {
       type: 'place-card',
-      playerId: socket.id,
+      playerId: pid,
       data: { cardIndex: payload.cardIndex, columnEliminated: result.columnEliminated, replacedCard: result.replacedCard },
     });
 
     if (result.columnEliminated !== undefined) {
       io.to(room.code).emit('animation-event', {
         type: 'column-eliminate',
-        playerId: socket.id,
+        playerId: pid,
         data: { column: result.columnEliminated },
       });
     }
@@ -375,8 +395,10 @@ export class RoomManager {
   ): void {
     const room = this.getRoom(socket);
     if (!room?.engine) return;
+    const pid = this.getPlayerId(socket);
+    if (!pid) return;
 
-    const result = room.engine.discardDrawnCard(socket.id);
+    const result = room.engine.discardDrawnCard(pid);
     if (!result.ok) {
       log(room.code, `Human discardDrawnCard FAILED: ${result.error}`);
       socket.emit('error', { message: result.error });
@@ -386,7 +408,7 @@ export class RoomManager {
 
     io.to(room.code).emit('animation-event', {
       type: 'discard-card',
-      playerId: socket.id,
+      playerId: pid,
       data: {},
     });
 
@@ -400,8 +422,10 @@ export class RoomManager {
   ): void {
     const room = this.getRoom(socket);
     if (!room?.engine) return;
+    const pid = this.getPlayerId(socket);
+    if (!pid) return;
 
-    const result = room.engine.flipCard(socket.id, payload.cardIndex);
+    const result = room.engine.flipCard(pid, payload.cardIndex);
     if (!result.ok) {
       log(room.code, `Human flipCard FAILED: ${result.error}`);
       socket.emit('error', { message: result.error });
@@ -411,14 +435,14 @@ export class RoomManager {
 
     io.to(room.code).emit('animation-event', {
       type: 'flip-card',
-      playerId: socket.id,
+      playerId: pid,
       data: { cardIndex: payload.cardIndex, columnEliminated: result.columnEliminated },
     });
 
     if (result.columnEliminated !== undefined) {
       io.to(room.code).emit('animation-event', {
         type: 'column-eliminate',
-        playerId: socket.id,
+        playerId: pid,
         data: { column: result.columnEliminated },
       });
     }
@@ -435,8 +459,9 @@ export class RoomManager {
   ): void {
     const room = this.getRoom(socket);
     if (!room) return;
+    const pid = this.getPlayerId(socket);
 
-    if (room.hostId !== socket.id) {
+    if (room.hostId !== pid) {
       socket.emit('error', { message: 'Only the host can add bots' });
       return;
     }
@@ -468,8 +493,9 @@ export class RoomManager {
   ): void {
     const room = this.getRoom(socket);
     if (!room) return;
+    const pid = this.getPlayerId(socket);
 
-    if (room.hostId !== socket.id) {
+    if (room.hostId !== pid) {
       socket.emit('error', { message: 'Only the host can remove bots' });
       return;
     }
@@ -485,8 +511,9 @@ export class RoomManager {
   ): void {
     const room = this.getRoom(socket);
     if (!room?.engine) return;
+    const pid = this.getPlayerId(socket);
 
-    if (room.hostId !== socket.id) {
+    if (room.hostId !== pid) {
       socket.emit('error', { message: 'Only the host can start a new game' });
       return;
     }
@@ -501,25 +528,29 @@ export class RoomManager {
     socket: Socket<ClientEvents, ServerEvents>
   ): void {
     const roomCode = socketRoomMap.get(socket.id);
+    const playerId = socketToPlayer.get(socket.id);
     if (!roomCode) return;
 
     const room = this.rooms.get(roomCode);
     if (!room) return;
 
     socketRoomMap.delete(socket.id);
+    socketToPlayer.delete(socket.id);
 
-    // If game not started, remove player
+    log(roomCode, `Player disconnected: ${playerId} (socket=${socket.id})`);
+
+    // If game not started, remove player from lobby
     if (!room.engine) {
-      room.players = room.players.filter((p) => p.socketId !== socket.id);
+      room.players = room.players.filter((p) => p.id !== playerId);
 
-      if (room.players.length === 0) {
+      if (room.players.filter(p => !p.isBot).length === 0) {
         this.rooms.delete(roomCode);
         this.roomCodes.delete(roomCode);
         return;
       }
 
       // Transfer host if needed
-      if (room.hostId === socket.id) {
+      if (room.hostId === playerId) {
         const newHost = room.players.find((p) => !p.isBot);
         if (newHost) {
           newHost.isHost = true;
@@ -527,26 +558,85 @@ export class RoomManager {
         }
       }
 
-      io.to(roomCode).emit('player-left', { playerId: socket.id });
+      io.to(roomCode).emit('player-left', { playerId: playerId ?? socket.id });
       io.to(roomCode).emit('lobby-update', this.getLobbyPlayers(room));
     } else {
-      // Mark player as disconnected in game
-      const player = room.engine.state.players.find((p) => p.id === socket.id);
-      if (player) {
-        player.connected = false;
+      // Game in progress — mark player as disconnected but keep room alive
+      const enginePlayer = room.engine.state.players.find((p) => p.id === playerId);
+      if (enginePlayer) {
+        enginePlayer.connected = false;
       }
 
-      io.to(roomCode).emit('player-left', { playerId: socket.id });
-      this.broadcastGameState(io, room);
+      // Schedule cleanup after 2 minutes if no humans reconnect
+      if (room.cleanupTimer) clearTimeout(room.cleanupTimer);
+      room.cleanupTimer = setTimeout(() => {
+        const hasConnectedHumans = room.players.some(
+          (p) => !p.isBot && socketRoomMap.has(p.socketId)
+        );
+        if (!hasConnectedHumans) {
+          log(roomCode, 'No humans reconnected after 2 min, cleaning up room');
+          this.rooms.delete(roomCode);
+          this.roomCodes.delete(roomCode);
+        }
+      }, 120_000);
+    }
+  }
 
-      // If all human players disconnected, clean up
-      const hasConnectedHumans = room.players.some(
-        (p) => !p.isBot && socketRoomMap.has(p.socketId)
-      );
-      if (!hasConnectedHumans) {
-        this.rooms.delete(roomCode);
-        this.roomCodes.delete(roomCode);
+  rejoinRoom(
+    io: Server<ClientEvents, ServerEvents>,
+    socket: Socket<ClientEvents, ServerEvents>,
+    payload: { playerId: string; roomCode: string }
+  ): void {
+    const room = this.rooms.get(payload.roomCode);
+    if (!room) {
+      socket.emit('error', { message: 'Raum nicht mehr verfuegbar' });
+      return;
+    }
+
+    // Find the player in the room by their stable ID
+    const player = room.players.find((p) => p.id === payload.playerId && !p.isBot);
+    if (!player) {
+      socket.emit('error', { message: 'Spieler nicht im Raum gefunden' });
+      return;
+    }
+
+    log(room.code, `Player rejoining: ${player.nickname} (${payload.playerId}) with new socket=${socket.id}`);
+
+    // Update mappings
+    player.socketId = socket.id;
+    socketRoomMap.set(socket.id, room.code);
+    socketToPlayer.set(socket.id, payload.playerId);
+
+    // Cancel cleanup timer since a human is back
+    if (room.cleanupTimer) {
+      clearTimeout(room.cleanupTimer);
+      room.cleanupTimer = undefined;
+    }
+
+    // Re-join the socket.io room
+    socket.join(room.code);
+
+    // Mark player as connected in engine
+    if (room.engine) {
+      const enginePlayer = room.engine.state.players.find((p) => p.id === payload.playerId);
+      if (enginePlayer) {
+        enginePlayer.connected = true;
       }
+
+      // Send current game state
+      const visibleState = room.engine.getVisibleState(payload.playerId);
+      socket.emit('rejoined', {
+        roomCode: room.code,
+        playerId: payload.playerId,
+        gameState: visibleState,
+      });
+    } else {
+      // Game hasn't started yet — rejoin lobby
+      socket.emit('room-joined', {
+        roomCode: room.code,
+        playerId: payload.playerId,
+        lobby: this.getLobbyPlayers(room),
+      });
     }
   }
 
@@ -554,6 +644,10 @@ export class RoomManager {
     const roomCode = socketRoomMap.get(socket.id);
     if (!roomCode) return null;
     return this.rooms.get(roomCode) || null;
+  }
+
+  private getPlayerId(socket: Socket): string | null {
+    return socketToPlayer.get(socket.id) ?? null;
   }
 
   private getLobbyPlayers(room: Room): LobbyPlayer[] {
