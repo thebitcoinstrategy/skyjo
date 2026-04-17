@@ -25,7 +25,8 @@ export default defineConfig({
         description: 'Spiele SkyJo mit Freunden und Familie!',
         theme_color: '#1b0f0a',
         background_color: '#1b0f0a',
-        display: 'standalone',
+        display: 'fullscreen',
+        display_override: ['fullscreen', 'standalone'],
         orientation: 'portrait',
         icons: [
           {
