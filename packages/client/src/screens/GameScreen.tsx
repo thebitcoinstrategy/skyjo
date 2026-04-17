@@ -418,7 +418,6 @@ export default function GameScreen() {
           next.add(`${item.pid}:${item.idx}`);
           return next;
         });
-        soundManager.play('card-flip');
       }, delay + i * interval));
     });
 
@@ -454,8 +453,7 @@ export default function GameScreen() {
 
     switch (event.type) {
       case 'flip-card': {
-        // Card component handles the flip animation itself via faceUp prop change
-        soundManager.play('card-flip');
+        // Card component handles both the flip animation and its sound via faceUp prop change
         await new Promise((r) => setTimeout(r, isMe ? 600 : 700));
         break;
       }
@@ -583,6 +581,23 @@ export default function GameScreen() {
           const drawnValue = event.data.value as CardValue | undefined;
           if (drawnValue !== undefined) {
             lastOpponentDrawRef.current = { value: drawnValue, source: 'discard' };
+          }
+          // Consume the pending state but preserve the current discardTop: the
+          // drawn card must stay visible on the pile until the place-card /
+          // discard-card animation physically moves it, otherwise the top
+          // appears to flip to the card beneath mid-turn.
+          for (let i = 0; i < 30; i++) {
+            if (useGameStore.getState().pendingGameState) break;
+            await new Promise((r) => setTimeout(r, 15));
+          }
+          const store = useGameStore.getState();
+          const pending = store.pendingGameState;
+          if (pending && store.gameState) {
+            const oldDiscardTop = store.gameState.discardTop;
+            useGameStore.setState({
+              gameState: { ...pending, discardTop: oldDiscardTop },
+              pendingGameState: null,
+            });
           }
         }
         // Card was already visible on discard pile — no revealed card overlay needed

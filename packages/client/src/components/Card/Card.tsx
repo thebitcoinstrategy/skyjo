@@ -2,6 +2,7 @@ import { useRef, useEffect, useState } from 'react';
 import { gsap } from 'gsap';
 import type { CardValue } from '@skyjo/shared';
 import CardIllustration from '../CardIllustration';
+import { soundManager } from '../../audio/SoundManager';
 
 interface CardProps {
   value: CardValue | null;
@@ -94,6 +95,9 @@ export default function Card({
       currentRotation.current = targetY;
       return;
     }
+
+    // Sound and visual flip are triggered by the same faceUp change, so they stay in sync
+    soundManager.play('card-flip');
 
     const isTiny = tiny || small;
     const tl = gsap.timeline();

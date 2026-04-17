@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react';
 import { gsap } from 'gsap';
 import type { CardValue } from '@skyjo/shared';
+import CardIllustration from './CardIllustration';
 
 interface DrawnCardProps {
   value: CardValue;
@@ -67,6 +68,9 @@ export default function DrawnCard({ value, canDiscard }: DrawnCardProps) {
           <div className="absolute inset-[1px] rounded-[5px] border border-white/25" />
           <span className="absolute top-0.5 left-1 text-[7px] font-bold text-white/70">{value}</span>
           <span className="absolute bottom-0.5 right-1 text-[7px] font-bold text-white/70 rotate-180">{value}</span>
+          <div className="absolute inset-0 flex items-end justify-end p-0.5 overflow-hidden">
+            <CardIllustration value={value} size="normal" />
+          </div>
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-[1px]">
               <span

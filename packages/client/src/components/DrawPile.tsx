@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react';
 import { gsap } from 'gsap';
 import type { CardValue } from '@skyjo/shared';
+import CardIllustration from './CardIllustration';
 
 interface DrawPileProps {
   count: number;
@@ -166,6 +167,11 @@ export default function DrawPile({ count, active, onClick, revealedCard }: DrawP
               >
                 <div className={`absolute inset-0 bg-gradient-to-br ${getCardBg(revealedCard.value)}`} />
                 <div className="absolute inset-[1px] rounded-sm border border-white/25" />
+                <span className="absolute top-0.5 left-1 text-[7px] font-bold text-white/70">{revealedCard.value}</span>
+                <span className="absolute bottom-0.5 right-1 text-[7px] font-bold text-white/70 rotate-180">{revealedCard.value}</span>
+                <div className="absolute inset-0 flex items-end justify-end p-0.5 overflow-hidden">
+                  <CardIllustration value={revealedCard.value} size="normal" />
+                </div>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-[1px]">
                     <span className="text-lg font-black text-white drop-shadow-md">{revealedCard.value}</span>
