@@ -20,7 +20,7 @@ import {
 } from '@skyjo/shared';
 
 type ActionResult =
-  | { ok: true; columnEliminated?: number }
+  | { ok: true; columnEliminated?: number; replacedCard?: { value: number; faceUp: boolean } }
   | { ok: false; error: string };
 
 interface PlayerInfo {
@@ -192,7 +192,7 @@ export class GameEngine {
     // Advance turn
     this.advanceTurn();
 
-    return { ok: true, columnEliminated: colEliminated };
+    return { ok: true, columnEliminated: colEliminated, replacedCard: { value: replacedCard.value, faceUp: replacedCard.faceUp } };
   }
 
   discardDrawnCard(playerId: string): ActionResult {

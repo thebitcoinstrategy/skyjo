@@ -7,9 +7,15 @@ interface GameStoreState {
   roundEndData: RoundEndPayload | null;
   gameEndData: GameEndPayload | null;
 
+  // Pending state: buffered while animations are playing
+  pendingGameState: VisibleGameState | null;
+  animating: boolean;
+
   setGameState: (state: VisibleGameState) => void;
   pushAnimation: (event: AnimationEventPayload) => void;
   shiftAnimation: () => AnimationEventPayload | undefined;
+  setAnimating: (v: boolean) => void;
+  flushPending: () => void;
   setRoundEndData: (data: RoundEndPayload | null) => void;
   setGameEndData: (data: GameEndPayload | null) => void;
   reset: () => void;
@@ -20,16 +26,41 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   animationQueue: [],
   roundEndData: null,
   gameEndData: null,
+  pendingGameState: null,
+  animating: false,
 
-  setGameState: (gameState) => set({ gameState }),
+  setGameState: (gameState) => {
+    if (get().animating) {
+      // Buffer the state — only the latest matters
+      set({ pendingGameState: gameState });
+    } else {
+      set({ gameState, pendingGameState: null });
+    }
+  },
   pushAnimation: (event) =>
-    set((s) => ({ animationQueue: [...s.animationQueue, event] })),
+    set((s) => ({ animationQueue: [...s.animationQueue, event], animating: true })),
   shiftAnimation: () => {
     const queue = get().animationQueue;
     if (queue.length === 0) return undefined;
     const [first, ...rest] = queue;
     set({ animationQueue: rest });
     return first;
+  },
+  setAnimating: (animating) => {
+    set({ animating });
+    // When animations finish, apply any buffered state
+    if (!animating) {
+      const pending = get().pendingGameState;
+      if (pending) {
+        set({ gameState: pending, pendingGameState: null });
+      }
+    }
+  },
+  flushPending: () => {
+    const pending = get().pendingGameState;
+    if (pending) {
+      set({ gameState: pending, pendingGameState: null });
+    }
   },
   setRoundEndData: (roundEndData) => set({ roundEndData }),
   setGameEndData: (gameEndData) => set({ gameEndData }),
@@ -39,5 +70,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       animationQueue: [],
       roundEndData: null,
       gameEndData: null,
+      pendingGameState: null,
+      animating: false,
     }),
 }));

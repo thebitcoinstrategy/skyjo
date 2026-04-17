@@ -42,42 +42,8 @@ export function useSound() {
     soundManager.updateMusicVolume(musicVolume);
   }, [musicVolume]);
 
-  // Listen to animation events for sounds
-  useEffect(() => {
-    const unsub = useGameStore.subscribe((state, prevState) => {
-      if (state.animationQueue.length > prevState.animationQueue.length) {
-        const latest = state.animationQueue[state.animationQueue.length - 1];
-        switch (latest.type) {
-          case 'flip-card':
-            soundManager.play('card-flip');
-            break;
-          case 'draw-from-pile':
-          case 'draw-from-discard':
-            soundManager.play('draw');
-            break;
-          case 'place-card':
-            soundManager.play('card-drag');
-            break;
-          case 'discard-card':
-            soundManager.play('card-place');
-            break;
-          case 'column-eliminate':
-            soundManager.play('column-eliminate');
-            break;
-          case 'deal':
-            soundManager.play('card-shuffle');
-            break;
-          case 'round-end':
-            soundManager.play('good-play');
-            break;
-          case 'game-end':
-            soundManager.play('win-fanfare');
-            break;
-        }
-      }
-    });
-    return unsub;
-  }, []);
+  // Sounds are now triggered from the animation handler in GameScreen
+  // (synchronized with the visual animations instead of firing immediately on queue push)
 
   // Play turn notification and announce player name via TTS
   useEffect(() => {
@@ -98,16 +64,20 @@ export function useSound() {
         soundManager.play('turn-notify');
       }
 
-      // TTS: announce whose turn it is
+      // TTS: announce other players' names (skip own turn)
       const currentPlayer = gameState.players[currTurnIndex];
-      if (currentPlayer && sfxEnabled) {
-        const name = currTurnIndex === myIndex ? 'Du' : currentPlayer.nickname;
+      if (currentPlayer && sfxEnabled && currTurnIndex !== myIndex) {
         try {
-          const utterance = new SpeechSynthesisUtterance(name);
+          const utterance = new SpeechSynthesisUtterance(currentPlayer.nickname);
+          utterance.lang = 'de-DE';
           utterance.rate = 1.1;
           utterance.volume = Math.min(sfxVolume, 0.8);
           utterance.pitch = 1.0;
-          speechSynthesis.cancel(); // Cancel any pending speech
+          // Pick a German voice if available
+          const voices = speechSynthesis.getVoices();
+          const germanVoice = voices.find((v) => v.lang.startsWith('de'));
+          if (germanVoice) utterance.voice = germanVoice;
+          speechSynthesis.cancel();
           speechSynthesis.speak(utterance);
         } catch {
           // TTS not available on this device

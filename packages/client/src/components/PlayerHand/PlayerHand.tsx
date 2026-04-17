@@ -10,6 +10,7 @@ interface PlayerHandProps {
   interactive?: boolean;
   isDealing?: boolean;
   highlightAll?: boolean;
+  highlightFaceDown?: boolean;
   dropTarget?: number | null;
   onTouchStartCard?: (cardIndex: number) => (e: React.TouchEvent) => void;
   skipFlipForIndex?: number | null;
@@ -23,6 +24,7 @@ export default function PlayerHand({
   interactive,
   isDealing,
   highlightAll,
+  highlightFaceDown,
   dropTarget,
   onTouchStartCard,
   skipFlipForIndex,
@@ -60,7 +62,7 @@ export default function PlayerHand({
                 tiny={tiny}
                 onClick={onCardClick ? () => onCardClick(cardIdx) : undefined}
                 interactive={interactive ?? false}
-                highlight={highlightAll && !small && !tiny}
+                highlight={!small && !tiny && (highlightAll || (highlightFaceDown && !card.faceUp))}
                 dealDelay={isDealing ? dealIndex * 0.06 : undefined}
                 dropTarget={dropTarget === cardIdx}
                 skipFlipAnimation={skipFlipForIndex === cardIdx}

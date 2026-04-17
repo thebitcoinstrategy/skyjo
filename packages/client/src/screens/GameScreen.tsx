@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback, useEffect, forwardRef } from 'react';
 import { gsap } from 'gsap';
 import { useGameStore } from '../stores/gameStore';
 import { useConnectionStore } from '../stores/connectionStore';
@@ -11,6 +11,7 @@ import DrawnCard from '../components/DrawnCard';
 import TurnIndicator from '../components/TurnIndicator';
 import type { AnimationEventPayload, CardValue } from '@skyjo/shared';
 import BackgroundArt from '../components/BackgroundArt';
+import { soundManager } from '../audio/SoundManager';
 
 /* ── Drag ghost ── */
 function DragGhost({ value, x, y }: { value: CardValue | null; x: number; y: number }) {
@@ -51,6 +52,258 @@ function DragGhost({ value, x, y }: { value: CardValue | null; x: number; y: num
   );
 }
 
+/* ── Flying card (animates from source to destination) ── */
+const FlyingCard = forwardRef<HTMLDivElement, {
+  value: CardValue;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  endScale?: number;
+  onDone?: () => void;
+}>(({ value, startX, startY, endX, endY, endScale = 0.45, onDone }, ref) => {
+  const innerRef = useRef<HTMLDivElement>(null);
+
+  function getStyle(v: number): string {
+    if (v <= -2) return 'from-blue-500 to-blue-700';
+    if (v === -1) return 'from-sky-400 to-sky-600';
+    if (v === 0) return 'from-yellow-400 to-amber-500';
+    if (v <= 4) return 'from-emerald-400 to-emerald-600';
+    if (v <= 8) return 'from-orange-400 to-orange-600';
+    return 'from-red-500 to-red-700';
+  }
+
+  // Offset for end position depends on scale — center the card at destination
+  const endOffsetX = 26 * endScale;
+  const endOffsetY = 34 * endScale;
+
+  useEffect(() => {
+    if (!innerRef.current) return;
+    const tl = gsap.timeline({ onComplete: onDone });
+    tl.fromTo(
+      innerRef.current,
+      {
+        left: startX - 26,
+        top: startY - 34,
+        scale: 1,
+        opacity: 1,
+      },
+      {
+        left: endX - endOffsetX,
+        top: endY - endOffsetY,
+        scale: endScale,
+        duration: 0.4,
+        ease: 'power3.out',
+      }
+    );
+    // Quick fade at destination
+    tl.to(innerRef.current, {
+      opacity: 0,
+      duration: 0.1,
+      ease: 'power2.in',
+    });
+  }, [startX, startY, endX, endY, endScale, endOffsetX, endOffsetY, onDone]);
+
+  return (
+    <div ref={ref}>
+      <div
+        ref={innerRef}
+        className="fixed w-[3.2rem] h-[4.2rem] rounded-md overflow-hidden shadow-2xl ring-2 ring-gold/80 pointer-events-none z-50"
+        style={{ left: startX - 26, top: startY - 34 }}
+      >
+        <div className={`absolute inset-0 bg-gradient-to-br ${getStyle(value)}`} />
+        <div className="absolute inset-[1px] rounded-sm border border-white/25" />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center">
+            <span className="text-lg font-black text-white drop-shadow-md">{value}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
+FlyingCard.displayName = 'FlyingCard';
+
+/* ── Displaced card: slide to center → flip → fly to discard ── */
+const DisplacedCard = forwardRef<HTMLDivElement, {
+  value: CardValue;
+  wasFaceDown: boolean;
+  startX: number;
+  startY: number;
+  startScale?: number;
+  midX: number;
+  midY: number;
+  endX: number;
+  endY: number;
+  onDone: () => void;
+}>(({ value, wasFaceDown, startX, startY, startScale = 1, midX, midY, endX, endY, onDone }, ref) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const flipInnerRef = useRef<HTMLDivElement>(null);
+
+  function getStyle(v: number): string {
+    if (v <= -2) return 'from-blue-500 to-blue-700';
+    if (v === -1) return 'from-sky-400 to-sky-600';
+    if (v === 0) return 'from-yellow-400 to-amber-500';
+    if (v <= 4) return 'from-emerald-400 to-emerald-600';
+    if (v <= 8) return 'from-orange-400 to-orange-600';
+    return 'from-red-500 to-red-700';
+  }
+
+  useEffect(() => {
+    if (!containerRef.current || !flipInnerRef.current) return;
+    const tl = gsap.timeline({ onComplete: onDone });
+
+    if (wasFaceDown) {
+      // Step 1: Slide to center area to flip
+      tl.to(containerRef.current, {
+        left: midX - 26,
+        top: midY - 34,
+        scale: 1,
+        duration: 0.35,
+        ease: 'power2.inOut',
+      });
+
+      // Step 2: Flip face-up
+      tl.to(containerRef.current, {
+        scale: 1.1,
+        duration: 0.1,
+        ease: 'power2.out',
+      });
+      tl.to(flipInnerRef.current, {
+        rotateY: 180,
+        duration: 0.35,
+        ease: 'power2.inOut',
+      }, '-=0.05');
+      tl.to(containerRef.current, {
+        scale: 1,
+        duration: 0.15,
+        ease: 'power2.out',
+      });
+      // Brief pause to show the value
+      tl.to({}, { duration: 0.15 });
+
+      // Step 3: Fly to discard pile
+      tl.to(containerRef.current, {
+        left: endX - 26,
+        top: endY - 34,
+        duration: 0.35,
+        ease: 'power2.inOut',
+      });
+    } else {
+      // Already face-up — fly directly to discard pile
+      tl.to(containerRef.current, {
+        left: endX - 26,
+        top: endY - 34,
+        scale: 1,
+        duration: 0.4,
+        ease: 'power3.out',
+      });
+    }
+
+    // Fade out
+    tl.to(containerRef.current, {
+      opacity: 0,
+      duration: 0.12,
+      ease: 'power2.in',
+    });
+  }, [wasFaceDown, midX, midY, endX, endY, onDone]);
+
+  return (
+    <div ref={ref}>
+      <div
+        ref={containerRef}
+        className="fixed w-[3.2rem] h-[4.2rem] pointer-events-none z-50"
+        style={{ left: startX - 26, top: startY - 34, scale: startScale, perspective: '600px' }}
+      >
+        <div
+          ref={flipInnerRef}
+          className="w-full h-full relative"
+          style={{
+            transformStyle: 'preserve-3d',
+            transform: wasFaceDown ? 'rotateY(0deg)' : 'rotateY(180deg)',
+          }}
+        >
+          {/* Back face */}
+          <div
+            className="absolute inset-0 rounded-md overflow-hidden shadow-2xl ring-2 ring-gold/80"
+            style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800" />
+            <div className="absolute inset-[2px] rounded-sm border border-blue-400/30" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-7 h-9 rounded-md bg-gradient-to-b from-blue-500/60 to-indigo-700/60 border border-blue-400/40 flex items-center justify-center">
+                <span className="text-[6px] font-black text-blue-200/80 tracking-wider">SKYJO</span>
+              </div>
+            </div>
+          </div>
+          {/* Front face */}
+          <div
+            className="absolute inset-0 rounded-md overflow-hidden shadow-2xl ring-2 ring-gold/80"
+            style={{
+              backfaceVisibility: 'hidden',
+              WebkitBackfaceVisibility: 'hidden',
+              transform: 'rotateY(180deg)',
+            }}
+          >
+            <div className={`absolute inset-0 bg-gradient-to-br ${getStyle(value)}`} />
+            <div className="absolute inset-[1px] rounded-sm border border-white/25" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center">
+                <span className="text-lg font-black text-white drop-shadow-md">{value}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
+DisplacedCard.displayName = 'DisplacedCard';
+
+/* ── Celebration overlay for column eliminate ── */
+const CelebrationOverlay = forwardRef<HTMLDivElement, { text: string }>(({ text }, ref) => {
+  const innerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!innerRef.current) return;
+    const tl = gsap.timeline();
+    tl.fromTo(innerRef.current,
+      { scale: 0, opacity: 0, rotateZ: -10, y: 30 },
+      { scale: 1.2, opacity: 1, rotateZ: 0, y: 0, duration: 0.4, ease: 'back.out(2)' }
+    );
+    tl.to(innerRef.current,
+      { scale: 1, duration: 0.2, ease: 'power2.out' }
+    );
+    // Pulse
+    tl.to(innerRef.current,
+      { scale: 1.08, duration: 0.3, ease: 'sine.inOut', yoyo: true, repeat: 3 }
+    );
+    // Fade out
+    tl.to(innerRef.current,
+      { opacity: 0, y: -20, scale: 0.8, duration: 0.4, ease: 'power2.in' },
+      '+=0.2'
+    );
+  }, []);
+
+  return (
+    <div ref={ref} className="fixed inset-0 z-[70] pointer-events-none flex items-center justify-center">
+      <div
+        ref={innerRef}
+        className="text-center"
+        style={{ textShadow: '0 0 30px rgba(255,215,0,0.8), 0 0 60px rgba(255,215,0,0.4), 0 4px 8px rgba(0,0,0,0.5)' }}
+      >
+        <div className="text-4xl font-black text-gold tracking-wider">
+          {text}
+        </div>
+        <div className="text-lg text-white/80 font-bold mt-1">
+          Spalte eliminiert!
+        </div>
+      </div>
+    </div>
+  );
+});
+CelebrationOverlay.displayName = 'CelebrationOverlay';
+
 export default function GameScreen() {
   const gameState = useGameStore((s) => s.gameState);
   const playerId = useConnectionStore((s) => s.playerId);
@@ -58,6 +311,7 @@ export default function GameScreen() {
   const myHandRef = useRef<HTMLDivElement>(null);
   const drawPileRef = useRef<HTMLDivElement>(null);
   const discardPileRef = useRef<HTMLDivElement>(null);
+  const drawnCardAreaRef = useRef<HTMLDivElement>(null);
 
   // Drag state — use ref for immediate reads (avoids stale closures in pointer handlers)
   const [isDragging, setIsDragging] = useState(false);
@@ -72,11 +326,19 @@ export default function GameScreen() {
   // Pending drop: if user drops before server confirms drawn card, queue the action
   const pendingDropRef = useRef<{ cardIndex: number } | 'discard' | null>(null);
 
+  // Track placed card indices to skip flip animation (opponent and own cards)
+  const [oppPlacedCards, setOppPlacedCards] = useState<Record<string, number>>({});
+
   // Track the card index we just placed (to skip flip animation on our own cards)
   const [justPlacedIndex, setJustPlacedIndex] = useState<number | null>(null);
 
   // Sparkle particles for eye candy
   const [sparkles, setSparkles] = useState<{ id: string; x: number; y: number; color: string }[]>([]);
+
+  // Column eliminate celebration
+  const [screenFlash, setScreenFlash] = useState(false);
+  const [celebrationText, setCelebrationText] = useState<string | null>(null);
+  const celebrationRef = useRef<HTMLDivElement>(null);
 
   // Revealed card shown on top of draw pile when opponent/bot draws
   const [revealedCard, setRevealedCard] = useState<{
@@ -84,6 +346,40 @@ export default function GameScreen() {
     nickname: string;
     avatar: string;
   } | null>(null);
+
+  // Keep a ref in sync with revealedCard so animation callback can read it
+  const revealedCardRef = useRef(revealedCard);
+  revealedCardRef.current = revealedCard;
+
+  // Track the last opponent draw (value + source) for flying card animations
+  const lastOpponentDrawRef = useRef<{ value: CardValue; source: 'pile' | 'discard' } | null>(null);
+
+  // Displaced card animation (old card slides to center → flips → flies to discard)
+  const [displacedCard, setDisplacedCard] = useState<{
+    value: CardValue;
+    wasFaceDown: boolean;
+    startX: number;
+    startY: number;
+    startScale?: number;
+    midX: number;
+    midY: number;
+    endX: number;
+    endY: number;
+  } | null>(null);
+  const displacedCardRef = useRef<HTMLDivElement>(null);
+  const displacedCardResolveRef = useRef<(() => void) | null>(null);
+
+  // Flying card animation (card moves from draw pile to opponent's deck or discard)
+  const [flyingCard, setFlyingCard] = useState<{
+    value: CardValue;
+    startX: number;
+    startY: number;
+    endX: number;
+    endY: number;
+    endScale?: number;
+  } | null>(null);
+  const flyingCardRef = useRef<HTMLDivElement>(null);
+  const flyingCardResolveRef = useRef<(() => void) | null>(null);
 
   // Ref for canPlaceCard — must be declared here (before early return) to satisfy hooks rules
   const canPlaceRef = useRef(false);
@@ -95,49 +391,120 @@ export default function GameScreen() {
     switch (event.type) {
       case 'flip-card': {
         // Card component handles the flip animation itself via faceUp prop change
-        await new Promise((r) => setTimeout(r, isMe ? 600 : 300));
+        soundManager.play('card-flip');
+        await new Promise((r) => setTimeout(r, isMe ? 600 : 700));
         break;
       }
       case 'column-eliminate': {
-        if (myHandRef.current && isMe) {
-          gsap.fromTo(
-            myHandRef.current,
-            { boxShadow: '0 0 40px rgba(255, 215, 0, 0.6)' },
-            { boxShadow: '0 0 0px rgba(255, 215, 0, 0)', duration: 1, ease: 'power2.out' }
-          );
-          // Spawn sparkle particles
-          const rect = myHandRef.current.getBoundingClientRect();
-          const cx = rect.left + rect.width / 2;
-          const cy = rect.top + rect.height / 2;
-          const colors = ['#ffd700', '#ff6b6b', '#48dbfb', '#ff9ff3', '#54a0ff'];
-          const newSparkles = Array.from({ length: 12 }, (_, i) => ({
-            id: `sparkle-${Date.now()}-${i}`,
-            x: cx + (Math.random() - 0.5) * rect.width,
-            y: cy + (Math.random() - 0.5) * rect.height * 0.5,
-            color: colors[i % colors.length],
-          }));
-          setSparkles(prev => [...prev, ...newSparkles]);
-          setTimeout(() => {
-            setSparkles(prev => prev.filter(s => !newSparkles.some(ns => ns.id === s.id)));
-          }, 1000);
+        soundManager.play('column-eliminate');
+        if (isMe) {
+          // === MEGA CELEBRATION ===
+
+          // 1. Screen flash
+          setScreenFlash(true);
+          setTimeout(() => setScreenFlash(false), 400);
+
+          // 2. Celebration text
+          setCelebrationText('SPALTE WEG! 🎉');
+          setTimeout(() => setCelebrationText(null), 2500);
+
+          // 3. TTS celebration
+          try {
+            const phrases = ['Spalte weg!', 'Fantastisch!', 'Super gemacht!', 'Unglaublich!', 'Perfekt!'];
+            const phrase = phrases[Math.floor(Math.random() * phrases.length)];
+            const utterance = new SpeechSynthesisUtterance(phrase);
+            utterance.lang = 'de-DE';
+            utterance.rate = 1.0;
+            utterance.volume = 0.9;
+            utterance.pitch = 1.3;
+            const voices = speechSynthesis.getVoices();
+            const germanVoice = voices.find((v) => v.lang.startsWith('de'));
+            if (germanVoice) utterance.voice = germanVoice;
+            speechSynthesis.cancel();
+            speechSynthesis.speak(utterance);
+          } catch { /* TTS not available */ }
+
+          // 4. Hand glow burst (multiple pulses)
+          if (myHandRef.current) {
+            const tl = gsap.timeline();
+            tl.fromTo(myHandRef.current,
+              { boxShadow: '0 0 60px 20px rgba(255, 215, 0, 0.8)' },
+              { boxShadow: '0 0 20px 5px rgba(255, 215, 0, 0.3)', duration: 0.3, ease: 'power2.out' }
+            );
+            tl.to(myHandRef.current,
+              { boxShadow: '0 0 50px 15px rgba(255, 215, 0, 0.7)', duration: 0.2, ease: 'power2.in' }
+            );
+            tl.to(myHandRef.current,
+              { boxShadow: '0 0 0px 0px rgba(255, 215, 0, 0)', duration: 0.8, ease: 'power2.out' }
+            );
+
+            // 5. Massive confetti explosion — 60 particles in multiple waves
+            const rect = myHandRef.current.getBoundingClientRect();
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top;
+            const colors = ['#ffd700', '#ff6b6b', '#48dbfb', '#ff9ff3', '#54a0ff', '#ff4757', '#2ed573', '#ffa502', '#ffffff', '#e056fd'];
+
+            // Wave 1 — big burst
+            const wave1 = Array.from({ length: 30 }, (_, i) => ({
+              id: `cel-${Date.now()}-w1-${i}`,
+              x: cx + (Math.random() - 0.5) * window.innerWidth * 0.8,
+              y: cy + (Math.random() - 0.5) * rect.height - Math.random() * 100,
+              color: colors[i % colors.length],
+            }));
+            setSparkles(prev => [...prev, ...wave1]);
+
+            // Wave 2 — delayed scatter
+            setTimeout(() => {
+              const wave2 = Array.from({ length: 20 }, (_, i) => ({
+                id: `cel-${Date.now()}-w2-${i}`,
+                x: cx + (Math.random() - 0.5) * window.innerWidth,
+                y: cy + (Math.random() - 0.5) * 200 - Math.random() * 50,
+                color: colors[(i + 3) % colors.length],
+              }));
+              setSparkles(prev => [...prev, ...wave2]);
+              setTimeout(() => {
+                setSparkles(prev => prev.filter(s => !wave2.some(w => w.id === s.id)));
+              }, 1200);
+            }, 300);
+
+            // Wave 3 — final sparkles
+            setTimeout(() => {
+              const wave3 = Array.from({ length: 15 }, (_, i) => ({
+                id: `cel-${Date.now()}-w3-${i}`,
+                x: cx + (Math.random() - 0.5) * window.innerWidth * 0.6,
+                y: cy - Math.random() * 150,
+                color: colors[(i + 5) % colors.length],
+              }));
+              setSparkles(prev => [...prev, ...wave3]);
+              setTimeout(() => {
+                setSparkles(prev => prev.filter(s => !wave3.some(w => w.id === s.id)));
+              }, 1200);
+            }, 600);
+
+            // Clean up wave 1
+            setTimeout(() => {
+              setSparkles(prev => prev.filter(s => !wave1.some(w => w.id === s.id)));
+            }, 1500);
+          }
         }
-        await new Promise((r) => setTimeout(r, 700));
+        await new Promise((r) => setTimeout(r, 2200));
         break;
       }
-      case 'draw-from-pile':
-      case 'draw-from-discard': {
+      case 'draw-from-pile': {
+        soundManager.play('draw');
         if (!isMe) {
           const gs = useGameStore.getState().gameState;
           const drawer = gs?.players.find((p) => p.id === event.playerId);
           const drawnValue = event.data.value as CardValue | undefined;
           if (drawer && drawnValue !== undefined) {
+            lastOpponentDrawRef.current = { value: drawnValue, source: 'pile' };
             setRevealedCard({
               value: drawnValue,
               nickname: drawer.nickname,
               avatar: drawer.avatar,
             });
-            await new Promise((r) => setTimeout(r, 2000));
-            setRevealedCard(null);
+            // Wait for flip animation, then keep showing until next event clears it
+            await new Promise((r) => setTimeout(r, 800));
           } else {
             await new Promise((r) => setTimeout(r, 200));
           }
@@ -146,8 +513,211 @@ export default function GameScreen() {
         }
         break;
       }
+      case 'draw-from-discard': {
+        soundManager.play('draw');
+        if (!isMe) {
+          const drawnValue = event.data.value as CardValue | undefined;
+          if (drawnValue !== undefined) {
+            lastOpponentDrawRef.current = { value: drawnValue, source: 'discard' };
+          }
+        }
+        // Card was already visible on discard pile — no revealed card overlay needed
+        await new Promise((r) => setTimeout(r, isMe ? 200 : 400));
+        break;
+      }
+      case 'place-card': {
+        soundManager.play('card-drag');
+        // Mark this card index to skip flip animation (card is being placed, not flipped)
+        if (!isMe) {
+          setOppPlacedCards((prev) => ({ ...prev, [event.playerId]: event.data.cardIndex as number }));
+        }
+        const replaced = event.data.replacedCard as { value: number; faceUp: boolean } | undefined;
+        const oppDraw = lastOpponentDrawRef.current;
+        if (!isMe && oppDraw) {
+          // Source: draw pile or discard pile, depending on where opponent drew from
+          const sourceEl = oppDraw.source === 'pile' ? drawPileRef.current : discardPileRef.current;
+          const playerContainer = document.querySelector(`[data-player-id="${event.playerId}"]`);
+          const targetCard = playerContainer?.querySelector(`[data-card-index="${event.data.cardIndex}"]`);
+
+          if (sourceEl && targetCard) {
+            const sourceRect = sourceEl.getBoundingClientRect();
+            const targetRect = targetCard.getBoundingClientRect();
+
+            // Step 1: Fly drawn card from source pile to opponent's deck
+            setRevealedCard(null);
+            await new Promise<void>((resolve) => {
+              flyingCardResolveRef.current = () => {
+                setFlyingCard(null);
+                resolve();
+              };
+              setFlyingCard({
+                value: oppDraw.value,
+                startX: sourceRect.left + sourceRect.width / 2,
+                startY: sourceRect.top + sourceRect.height / 2,
+                endX: targetRect.left + targetRect.width / 2,
+                endY: targetRect.top + targetRect.height / 2,
+              });
+            });
+
+            // Step 2: Animate displaced card out of opponent's deck → center → flip → discard
+            const discardEl = discardPileRef.current;
+            const midEl = drawnCardAreaRef.current;
+            const updatedCard = playerContainer?.querySelector(`[data-card-index="${event.data.cardIndex}"]`);
+            const cardEl2 = updatedCard || targetCard;
+
+            if (replaced && discardEl && midEl) {
+              const cardRect2 = cardEl2.getBoundingClientRect();
+              const discardRect = discardEl.getBoundingClientRect();
+              const midRect = midEl.getBoundingClientRect();
+
+              // Partially apply state: update deck but keep old discard top
+              for (let i = 0; i < 30; i++) {
+                if (useGameStore.getState().pendingGameState) break;
+                await new Promise((r) => setTimeout(r, 15));
+              }
+              const store = useGameStore.getState();
+              const pending = store.pendingGameState;
+              if (pending && store.gameState) {
+                const oldDiscardTop = store.gameState.discardTop;
+                useGameStore.setState({
+                  gameState: { ...pending, discardTop: oldDiscardTop },
+                  pendingGameState: null,
+                });
+              }
+
+              await new Promise<void>((resolve) => {
+                displacedCardResolveRef.current = () => {
+                  setDisplacedCard(null);
+                  if (pending) {
+                    useGameStore.setState((s) => ({
+                      gameState: s.gameState ? { ...s.gameState, discardTop: pending.discardTop } : s.gameState,
+                    }));
+                  }
+                  resolve();
+                };
+                setDisplacedCard({
+                  value: replaced.value as CardValue,
+                  wasFaceDown: !replaced.faceUp,
+                  startX: cardRect2.left + cardRect2.width / 2,
+                  startY: cardRect2.top + cardRect2.height / 2,
+                  startScale: 0.4,
+                  midX: midRect.left + midRect.width / 2,
+                  midY: midRect.top + midRect.height / 2,
+                  endX: discardRect.left + discardRect.width / 2,
+                  endY: discardRect.top + discardRect.height / 2,
+                });
+              });
+            }
+
+            lastOpponentDrawRef.current = null;
+          } else {
+            setRevealedCard(null);
+            lastOpponentDrawRef.current = null;
+            await new Promise((r) => setTimeout(r, 300));
+          }
+        } else if (isMe) {
+          // Animate displaced card: slide to center → flip → fly to discard
+          const replaced = event.data.replacedCard as { value: number; faceUp: boolean } | undefined;
+          const cardIndex = event.data.cardIndex as number;
+          const cardEl = myHandRef.current?.querySelector(`[data-card-index="${cardIndex}"]`);
+          const discardEl = discardPileRef.current;
+          const midEl = drawnCardAreaRef.current;
+
+          if (replaced && cardEl && discardEl && midEl) {
+            const cardRect = cardEl.getBoundingClientRect();
+            const discardRect = discardEl.getBoundingClientRect();
+            const midRect = midEl.getBoundingClientRect();
+
+            // Wait for game-state-update to arrive, then partially apply it:
+            // show the new card in the deck immediately, but keep the old discard pile
+            // so it only updates when the displaced card animation lands on it.
+            for (let i = 0; i < 30; i++) {
+              if (useGameStore.getState().pendingGameState) break;
+              await new Promise((r) => setTimeout(r, 15));
+            }
+            const store = useGameStore.getState();
+            const pending = store.pendingGameState;
+            if (pending && store.gameState) {
+              // Apply new state but preserve current discardTop
+              const oldDiscardTop = store.gameState.discardTop;
+              useGameStore.setState({
+                gameState: { ...pending, discardTop: oldDiscardTop },
+                pendingGameState: null,
+              });
+            }
+
+            await new Promise<void>((resolve) => {
+              displacedCardResolveRef.current = () => {
+                setDisplacedCard(null);
+                // Now apply the real discard top
+                if (pending) {
+                  useGameStore.setState((s) => ({
+                    gameState: s.gameState ? { ...s.gameState, discardTop: pending.discardTop } : s.gameState,
+                  }));
+                }
+                resolve();
+              };
+              setDisplacedCard({
+                value: replaced.value as CardValue,
+                wasFaceDown: !replaced.faceUp,
+                startX: cardRect.left + cardRect.width / 2,
+                startY: cardRect.top + cardRect.height / 2,
+                midX: midRect.left + midRect.width / 2,
+                midY: midRect.top + midRect.height / 2,
+                endX: discardRect.left + discardRect.width / 2,
+                endY: discardRect.top + discardRect.height / 2,
+              });
+            });
+          } else {
+            await new Promise((r) => setTimeout(r, 200));
+          }
+        } else {
+          setRevealedCard(null);
+          await new Promise((r) => setTimeout(r, 200));
+        }
+        break;
+      }
+      case 'discard-card': {
+        soundManager.play('card-place');
+        const oppDraw2 = lastOpponentDrawRef.current;
+        if (!isMe && oppDraw2) {
+          const sourceEl = oppDraw2.source === 'discard' ? discardPileRef.current : drawPileRef.current;
+          const targetEl = discardPileRef.current;
+
+          if (sourceEl && targetEl) {
+            const sourceRect = sourceEl.getBoundingClientRect();
+            const targetRect = targetEl.getBoundingClientRect();
+
+            setRevealedCard(null);
+            lastOpponentDrawRef.current = null;
+            await new Promise<void>((resolve) => {
+              flyingCardResolveRef.current = () => {
+                setFlyingCard(null);
+                resolve();
+              };
+              setFlyingCard({
+                value: oppDraw2.value,
+                startX: sourceRect.left + sourceRect.width / 2,
+                startY: sourceRect.top + sourceRect.height / 2,
+                endX: targetRect.left + targetRect.width / 2,
+                endY: targetRect.top + targetRect.height / 2,
+                endScale: 1,
+              });
+            });
+          } else {
+            setRevealedCard(null);
+            lastOpponentDrawRef.current = null;
+            await new Promise((r) => setTimeout(r, 300));
+          }
+        } else {
+          if (!isMe) setRevealedCard(null);
+          lastOpponentDrawRef.current = null;
+          await new Promise((r) => setTimeout(r, 200));
+        }
+        break;
+      }
       default: {
-        // All other events (place, discard) — just a small delay for sequencing
+        // All other events — just a small delay for sequencing
         await new Promise((r) => setTimeout(r, 200));
       }
     }
@@ -166,9 +736,20 @@ export default function GameScreen() {
     } else {
       setJustPlacedIndex(pending.cardIndex);
       socket.emit('place-drawn-card', { cardIndex: pending.cardIndex });
-      setTimeout(() => setJustPlacedIndex(null), 100);
     }
   }, [gameState?.drawnCard]);
+
+  // Clear justPlacedIndex after the game state has been applied
+  // (the Card component reads skipFlipAnimation during the render where faceUp changes,
+  // so we clear it on the next game state update after it was set)
+  useEffect(() => {
+    if (justPlacedIndex !== null) {
+      setJustPlacedIndex(null);
+    }
+    if (Object.keys(oppPlacedCards).length > 0) {
+      setOppPlacedCards({});
+    }
+  }, [gameState]);
 
   if (!gameState || !playerId) {
     return (
@@ -238,7 +819,6 @@ export default function GameScreen() {
     if (canPlaceCard && !isDragging) {
       setJustPlacedIndex(cardIndex);
       socket.emit('place-drawn-card', { cardIndex });
-      setTimeout(() => setJustPlacedIndex(null), 100);
       return;
     }
 
@@ -305,7 +885,6 @@ export default function GameScreen() {
       if (cardReady) {
         setJustPlacedIndex(dt);
         socket.emit('place-drawn-card', { cardIndex: dt });
-        setTimeout(() => setJustPlacedIndex(null), 100);
       } else {
         // Server hasn't confirmed drawn card yet — queue the drop
         pendingDropRef.current = { cardIndex: dt };
@@ -361,22 +940,79 @@ export default function GameScreen() {
       <BackgroundArt variant="game" />
       <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-gold/20 to-transparent" />
 
-      {/* ═══ SPARKLE PARTICLES ═══ */}
-      {sparkles.map((s) => (
-        <div
-          key={s.id}
-          className="sparkle-particle fixed pointer-events-none z-50"
-          style={{ left: s.x, top: s.y }}
-        >
-          <svg width="10" height="10" viewBox="0 0 10 10">
-            <path d="M5 0L5.8 3.5L10 5L5.8 5.8L5 10L4.2 5.8L0 5L4.2 3.5Z" fill={s.color} />
-          </svg>
-        </div>
-      ))}
+      {/* ═══ SCREEN FLASH (column eliminate) ═══ */}
+      {screenFlash && (
+        <div className="fixed inset-0 z-[60] pointer-events-none bg-gold/30 animate-flash" />
+      )}
+
+      {/* ═══ CELEBRATION TEXT (column eliminate) ═══ */}
+      {celebrationText && (
+        <CelebrationOverlay ref={celebrationRef} text={celebrationText} />
+      )}
+
+      {/* ═══ SPARKLE / CONFETTI PARTICLES ═══ */}
+      {sparkles.map((s, i) => {
+        const size = 8 + (i % 5) * 4;
+        const isConfetti = i % 3 !== 0;
+        return (
+          <div
+            key={s.id}
+            className="sparkle-particle fixed pointer-events-none z-50"
+            style={{ left: s.x, top: s.y }}
+          >
+            {isConfetti ? (
+              <div
+                className="rounded-sm"
+                style={{
+                  width: size,
+                  height: size * 0.6,
+                  backgroundColor: s.color,
+                  transform: `rotate(${(i * 37) % 360}deg)`,
+                }}
+              />
+            ) : (
+              <svg width={size} height={size} viewBox="0 0 10 10">
+                <path d="M5 0L5.8 3.5L10 5L5.8 5.8L5 10L4.2 5.8L0 5L4.2 3.5Z" fill={s.color} />
+              </svg>
+            )}
+          </div>
+        );
+      })}
 
       {/* ═══ DRAG GHOST ═══ */}
       {isDragging && (
         <DragGhost value={gameState.drawnCard ?? dragPreviewValue} x={dragPos.x} y={dragPos.y} />
+      )}
+
+      {/* ═══ FLYING CARD (opponent place/discard animation) ═══ */}
+      {flyingCard && (
+        <FlyingCard
+          ref={flyingCardRef}
+          value={flyingCard.value}
+          startX={flyingCard.startX}
+          startY={flyingCard.startY}
+          endX={flyingCard.endX}
+          endY={flyingCard.endY}
+          endScale={flyingCard.endScale}
+          onDone={() => { flyingCardResolveRef.current?.(); flyingCardResolveRef.current = null; }}
+        />
+      )}
+
+      {/* ═══ DISPLACED CARD (my card → center → flip → discard) ═══ */}
+      {displacedCard && (
+        <DisplacedCard
+          ref={displacedCardRef}
+          value={displacedCard.value}
+          wasFaceDown={displacedCard.wasFaceDown}
+          startX={displacedCard.startX}
+          startY={displacedCard.startY}
+          startScale={displacedCard.startScale}
+          midX={displacedCard.midX}
+          midY={displacedCard.midY}
+          endX={displacedCard.endX}
+          endY={displacedCard.endY}
+          onDone={() => { displacedCardResolveRef.current?.(); displacedCardResolveRef.current = null; }}
+        />
       )}
 
       {/* ═══ CONTENT ═══ */}
@@ -416,7 +1052,7 @@ export default function GameScreen() {
                         {opp.score}
                       </span>
                     </div>
-                    <PlayerHand cards={opp.cards} tiny />
+                    <PlayerHand cards={opp.cards} tiny skipFlipForIndex={oppPlacedCards[opp.id] ?? null} />
                   </div>
                 </div>
               );
@@ -458,7 +1094,7 @@ export default function GameScreen() {
           </div>
 
           {/* Drawn card — shown below piles, "held in hand" */}
-          <div className="h-[5.5rem]">
+          <div ref={drawnCardAreaRef} className="h-[5.5rem]">
             {hasDrawnCard && (
               <div
                 onPointerDown={handleDragStart}
@@ -509,7 +1145,8 @@ export default function GameScreen() {
             interactive={canInteract}
             onCardClick={canInteract ? handleCardClick : undefined}
             isDealing={isDealing}
-            highlightAll={canPlaceCard || (isMyTurn && gameState.turnPhase === 'must_flip')}
+            highlightAll={canPlaceCard}
+            highlightFaceDown={isMyTurn && gameState.turnPhase === 'must_flip' || (gameState.phase === 'flipping_initial' && me.initialFlipsRemaining > 0)}
             dropTarget={dropTarget}
             skipFlipForIndex={justPlacedIndex}
           />

@@ -343,7 +343,7 @@ export class RoomManager {
     io.to(room.code).emit('animation-event', {
       type: 'place-card',
       playerId: socket.id,
-      data: { cardIndex: payload.cardIndex, columnEliminated: result.columnEliminated },
+      data: { cardIndex: payload.cardIndex, columnEliminated: result.columnEliminated, replacedCard: result.replacedCard },
     });
 
     if (result.columnEliminated !== undefined) {
@@ -612,38 +612,45 @@ export class RoomManager {
     const engine = room.engine;
     const state = engine.state;
 
-    // Handle bot initial flips
+    // Handle bot initial flips — stagger each flip so animations play one at a time
     if (state.phase === 'flipping_initial') {
+      // Collect all bot flips to schedule sequentially
+      const flips: { player: typeof state.players[0]; tier: ReturnType<typeof room.botDifficulty.getTier> }[] = [];
       for (const player of state.players) {
         if (!player.isBot || player.initialFlipsRemaining <= 0) continue;
-
         const tier = room.botDifficulty.getTier();
-        const delay = 800 + Math.random() * 1200; // 800-2000ms
+        // Each remaining flip gets its own entry
+        for (let i = 0; i < player.initialFlipsRemaining; i++) {
+          flips.push({ player, tier });
+        }
+      }
 
+      // Schedule each flip with staggered delays (800ms apart, first after 800-1500ms)
+      const baseDelay = 800 + Math.random() * 700;
+      const flipInterval = 800;
+
+      flips.forEach((flip, idx) => {
         setTimeout(() => {
           if (!room.engine) return;
-          while (player.initialFlipsRemaining > 0) {
-            const cardIndex = Bot.decideInitialFlip(player, tier);
-            if (cardIndex < 0) break;
+          const cardIndex = Bot.decideInitialFlip(flip.player, flip.tier);
+          if (cardIndex < 0) return;
 
-            const result = engine.flipInitialCard(player.id, cardIndex);
-            if (result.ok) {
-              io.to(room.code).emit('animation-event', {
-                type: 'flip-card',
-                playerId: player.id,
-                data: { cardIndex },
-              });
-            }
+          const result = engine.flipInitialCard(flip.player.id, cardIndex);
+          if (result.ok) {
+            io.to(room.code).emit('animation-event', {
+              type: 'flip-card',
+              playerId: flip.player.id,
+              data: { cardIndex },
+            });
+            this.broadcastGameState(io, room);
           }
 
-          this.broadcastGameState(io, room);
-
-          // Check if all initial flips done -> game might have started playing
-          if (state.phase === 'playing') {
-            this.processBotTurns(io, room);
+          // After the last flip, check if game has started
+          if (idx === flips.length - 1 && state.phase === 'playing') {
+            setTimeout(() => this.processBotTurns(io, room), 500);
           }
-        }, delay);
-      }
+        }, baseDelay + idx * flipInterval);
+      });
       return;
     }
 
@@ -666,10 +673,13 @@ export class RoomManager {
       log(room.code, `Bot ${currentPlayer.nickname} decides: ${JSON.stringify(actions.map(a => a.type))}`);
 
       // Chain actions sequentially with cumulative delays
+      // flip-card (must_flip after discard) happens quickly; other actions get normal delay
       let cumulativeDelay = 0;
 
       for (const action of actions) {
-        const actionDelay = 600 + Math.random() * 800;
+        const actionDelay = action.type === 'flip-card'
+          ? 200 + Math.random() * 200   // Quick flip after discard
+          : 600 + Math.random() * 800;  // Normal delay for other actions
         cumulativeDelay += actionDelay;
 
         setTimeout(() => {
@@ -708,7 +718,7 @@ export class RoomManager {
                 io.to(room.code).emit('animation-event', {
                   type: 'place-card',
                   playerId: currentPlayer.id,
-                  data: { cardIndex: action.cardIndex, columnEliminated: result.columnEliminated },
+                  data: { cardIndex: action.cardIndex, columnEliminated: result.columnEliminated, replacedCard: result.replacedCard },
                 });
                 if (result.columnEliminated !== undefined) {
                   io.to(room.code).emit('animation-event', {
@@ -779,7 +789,7 @@ export class RoomManager {
         } else {
           log(room.code, `Game not in play phase: ${state.phase}`);
         }
-      }, cumulativeDelay + 500);
+      }, cumulativeDelay + 1000);
     };
 
     // Initial delay before bot starts its turn

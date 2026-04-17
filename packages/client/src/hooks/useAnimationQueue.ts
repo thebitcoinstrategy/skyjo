@@ -7,6 +7,7 @@ type AnimationHandler = (event: AnimationEventPayload) => Promise<void>;
 /**
  * Processes animation events sequentially from the queue.
  * Each animation must resolve before the next one starts.
+ * While processing, game state updates are buffered and applied after all animations complete.
  */
 export function useAnimationQueue(handler: AnimationHandler) {
   const processing = useRef(false);
@@ -16,6 +17,7 @@ export function useAnimationQueue(handler: AnimationHandler) {
   const processQueue = useCallback(async () => {
     if (processing.current) return;
     processing.current = true;
+    useGameStore.getState().setAnimating(true);
 
     while (true) {
       const event = useGameStore.getState().shiftAnimation();
@@ -29,6 +31,7 @@ export function useAnimationQueue(handler: AnimationHandler) {
     }
 
     processing.current = false;
+    useGameStore.getState().setAnimating(false);
   }, []);
 
   // Trigger processing whenever the queue changes

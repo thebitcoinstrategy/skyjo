@@ -230,32 +230,70 @@ class SoundManagerClass {
    */
   private createEliminateHowl(): Howl {
     const sampleRate = 44100;
-    const duration = 0.5;
+    const duration = 2.0;
     const numSamples = Math.floor(sampleRate * duration);
     const buffer = new ArrayBuffer(44 + numSamples * 2);
     const view = new DataView(buffer);
     this.writeWavHeader(view, numSamples, sampleRate);
 
+    // Triumphant fanfare: C-E-G-C arpeggio + sparkle cascade + bass boom
+    const notes = [
+      { freq: 523, start: 0.0, dur: 0.6 },   // C5
+      { freq: 659, start: 0.08, dur: 0.55 },  // E5
+      { freq: 784, start: 0.16, dur: 0.5 },   // G5
+      { freq: 1046, start: 0.24, dur: 0.7 },  // C6
+      { freq: 1318, start: 0.35, dur: 0.6 },  // E6
+      { freq: 1568, start: 0.45, dur: 0.8 },  // G6 — top note, longest
+    ];
+
     let prev = 0;
     for (let i = 0; i < numSamples; i++) {
       const t = i / sampleRate;
-      const normalizedT = t / duration;
+      const nt = t / duration;
 
-      // Rising shimmer tone
-      const shimmerFreq = 600 + normalizedT * 1200;
-      const shimmer = Math.sin(2 * Math.PI * shimmerFreq * t) * Math.exp(-normalizedT * 3) * 0.15;
+      // Bass boom at the start
+      const boomFreq = 80 * Math.exp(-t * 3);
+      const boom = Math.sin(2 * Math.PI * boomFreq * t) * Math.exp(-t * 4) * 0.25;
 
-      // Whoosh noise
+      // Arpeggio chime notes
+      let chime = 0;
+      for (const n of notes) {
+        if (t >= n.start && t < n.start + n.dur) {
+          const localT = (t - n.start) / n.dur;
+          const env = Math.sin(localT * Math.PI) * Math.exp(-localT * 2);
+          // Rich tone: fundamental + octave + fifth
+          chime += Math.sin(2 * Math.PI * n.freq * t) * env * 0.12;
+          chime += Math.sin(2 * Math.PI * n.freq * 2 * t) * env * 0.04;
+          chime += Math.sin(2 * Math.PI * n.freq * 1.5 * t) * env * 0.03;
+        }
+      }
+
+      // Sparkle cascade — random high pings throughout
+      let sparkle = 0;
+      for (let s = 0; s < 8; s++) {
+        const sStart = 0.1 + s * 0.15;
+        const sFreq = 2500 + s * 400;
+        if (t >= sStart && t < sStart + 0.12) {
+          const sT = (t - sStart) / 0.12;
+          sparkle += Math.sin(2 * Math.PI * sFreq * t) * Math.exp(-sT * 6) * 0.06;
+        }
+      }
+
+      // Shimmer wash — rising noise sweep
       const noise = Math.random() * 2 - 1;
-      const alpha = 0.08 + normalizedT * 0.15;
+      const alpha = 0.05 + nt * 0.1;
       prev = prev * (1 - alpha) + noise * alpha;
-      const whooshEnv = Math.sin(normalizedT * Math.PI) * 0.2;
+      const shimmerEnv = Math.sin(nt * Math.PI) * 0.08;
 
-      // Sparkle: high-frequency pings
-      const sparkle = Math.sin(2 * Math.PI * (2000 + normalizedT * 2000) * t) *
-        Math.exp(-((normalizedT - 0.3) * (normalizedT - 0.3)) * 20) * 0.1;
+      // Final reverb tail — fading chord
+      let tail = 0;
+      if (t > 0.8) {
+        const tailT = (t - 0.8) / (duration - 0.8);
+        const tailEnv = Math.exp(-tailT * 3) * 0.08;
+        tail = (Math.sin(2 * Math.PI * 523 * t) + Math.sin(2 * Math.PI * 784 * t) + Math.sin(2 * Math.PI * 1046 * t)) * tailEnv;
+      }
 
-      const sample = shimmer + prev * whooshEnv + sparkle;
+      const sample = boom + chime + sparkle + prev * shimmerEnv + tail;
       const value = Math.max(-32768, Math.min(32767, Math.floor(sample * 32767)));
       view.setInt16(44 + i * 2, value, true);
     }

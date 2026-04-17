@@ -77,6 +77,27 @@ html, body {
   animation: pile-glow 1.5s ease-in-out infinite;
 }
 
+/* Pulsing highlight for flippable cards */
+.card-highlight-pulse {
+  animation: card-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes card-pulse {
+  0%, 100% { box-shadow: 0 0 6px 2px rgba(245, 193, 108, 0.4); }
+  50% { box-shadow: 0 0 14px 5px rgba(245, 193, 108, 0.7); }
+}
+
+/* Screen flash for column eliminate celebration */
+.animate-flash {
+  animation: screen-flash 0.4s ease-out forwards;
+}
+
+@keyframes screen-flash {
+  0% { opacity: 0.7; }
+  30% { opacity: 0.5; }
+  100% { opacity: 0; }
+}
+
 /* Card drag ghost styling */
 .card-dragging {
   opacity: 0.8;
@@ -104,12 +125,13 @@ html, body {
 
 /* Sparkle particle */
 @keyframes sparkle-rise {
-  0% { transform: translateY(0) scale(1); opacity: 1; }
-  100% { transform: translateY(-30px) scale(0); opacity: 0; }
+  0% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+  50% { opacity: 0.8; }
+  100% { transform: translateY(-80px) scale(0.3) rotate(180deg); opacity: 0; }
 }
 
 .sparkle-particle {
-  animation: sparkle-rise 0.8s ease-out forwards;
+  animation: sparkle-rise 1.2s ease-out forwards;
 }
 
 /* Card shine sweep effect */

@@ -96,37 +96,77 @@ export default function Card({
     }
 
     const isTiny = tiny || small;
-    const lift = isTiny ? -3 : -8;
-    const scaleUp = isTiny ? 1.05 : 1.12;
     const tl = gsap.timeline();
 
-    tl.to(containerRef.current, {
-      y: lift,
-      scale: scaleUp,
-      duration: 0.18,
-      ease: 'power2.out',
-    });
+    if (isTiny) {
+      // Opponent cards: bigger pop so the flip is clearly visible
+      tl.to(containerRef.current, {
+        y: -10,
+        scale: 1.6,
+        zIndex: 20,
+        duration: 0.2,
+        ease: 'power2.out',
+      });
 
-    tl.to(
-      innerRef.current,
-      {
-        rotateY: targetY,
-        duration: 0.4,
-        ease: 'power2.inOut',
-      },
-      '-=0.08'
-    );
+      tl.to(
+        innerRef.current,
+        {
+          rotateY: targetY,
+          duration: 0.45,
+          ease: 'power2.inOut',
+        },
+        '-=0.05'
+      );
 
-    tl.to(
-      containerRef.current,
-      {
-        y: 0,
-        scale: 1,
-        duration: 0.3,
-        ease: 'bounce.out',
-      },
-      '-=0.1'
-    );
+      // Gold flash on flip
+      tl.fromTo(
+        containerRef.current,
+        { boxShadow: '0 0 12px 4px rgba(245,193,108,0.7)' },
+        { boxShadow: '0 0 0px 0px rgba(245,193,108,0)', duration: 0.4, ease: 'power2.out' },
+        '-=0.25'
+      );
+
+      tl.to(
+        containerRef.current,
+        {
+          y: 0,
+          scale: 1,
+          zIndex: 0,
+          duration: 0.35,
+          ease: 'back.out(1.5)',
+        },
+        '-=0.2'
+      );
+    } else {
+      // Player's own cards: standard flip
+      tl.to(containerRef.current, {
+        y: -8,
+        scale: 1.12,
+        duration: 0.18,
+        ease: 'power2.out',
+      });
+
+      tl.to(
+        innerRef.current,
+        {
+          rotateY: targetY,
+          duration: 0.4,
+          ease: 'power2.inOut',
+        },
+        '-=0.08'
+      );
+
+      tl.to(
+        containerRef.current,
+        {
+          y: 0,
+          scale: 1,
+          duration: 0.3,
+          ease: 'bounce.out',
+        },
+        '-=0.1'
+      );
+    }
 
     currentRotation.current = targetY;
   }, [faceUp, small, tiny, skipFlipAnimation]);
@@ -180,7 +220,7 @@ export default function Card({
             ? 'cursor-pointer hover:brightness-110 active:scale-95 transition-all duration-150'
             : 'cursor-default'
         } ${
-          highlight ? `ring-2 ring-gold ${isCompact ? '' : 'ring-offset-1 ring-offset-felt'} rounded-md` : ''
+          highlight ? `ring-2 ring-gold ${isCompact ? '' : 'ring-offset-1 ring-offset-felt'} rounded-md card-highlight-pulse` : ''
         }`}
         style={{ perspective: '600px' }}
       >

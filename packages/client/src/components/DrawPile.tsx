@@ -35,14 +35,25 @@ export default function DrawPile({ count, active, onClick, revealedCard }: DrawP
     }
   }, [active]);
 
-  // Animate revealed card in
+  // Animate revealed card: pop up then flip from back to front
+  const flipInnerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (revealedCard && revealRef.current) {
+    if (revealedCard && revealRef.current && flipInnerRef.current) {
+      // Start with card back showing
+      gsap.set(flipInnerRef.current, { rotateY: 0 });
+      // Pop up
       gsap.fromTo(
         revealRef.current,
         { scale: 0.5, opacity: 0, y: 8 },
-        { scale: 1, opacity: 1, y: 0, duration: 0.3, ease: 'back.out(1.5)' }
+        { scale: 1, opacity: 1, y: 0, duration: 0.25, ease: 'power2.out' }
       );
+      // Then flip to reveal value
+      gsap.to(flipInnerRef.current, {
+        rotateY: 180,
+        duration: 0.5,
+        delay: 0.2,
+        ease: 'power2.inOut',
+      });
     }
   }, [revealedCard]);
 
@@ -122,25 +133,49 @@ export default function DrawPile({ count, active, onClick, revealedCard }: DrawP
           </div>
         </button>
 
-        {/* Revealed card overlay (when opponent/bot draws) */}
+        {/* Revealed card overlay (when opponent/bot draws) — flip animation */}
         {revealedCard && (
           <div
             ref={revealRef}
             className="absolute inset-0 flex items-center justify-center pointer-events-none"
-            style={{ zIndex: layers + 10 }}
+            style={{ zIndex: layers + 10, perspective: '600px' }}
           >
-            <div className="w-[3.2rem] h-[4.2rem] rounded-md overflow-hidden shadow-2xl ring-2 ring-gold/70 relative">
-              <div className={`absolute inset-0 bg-gradient-to-br ${getCardBg(revealedCard.value)}`} />
-              <div className="absolute inset-[1px] rounded-sm border border-white/25" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-[1px]">
-                  <span className="text-lg font-black text-white drop-shadow-md">{revealedCard.value}</span>
+            <div
+              ref={flipInnerRef}
+              className="w-[3.2rem] h-[4.2rem] relative"
+              style={{ transformStyle: 'preserve-3d' }}
+            >
+              {/* Back face (card back — visible initially) */}
+              <div
+                className="absolute inset-0 rounded-md overflow-hidden shadow-2xl ring-2 ring-gold/70"
+                style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800" />
+                <div className="absolute inset-[2px] rounded-sm border border-blue-400/30" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-7 h-9 rounded-md bg-gradient-to-b from-blue-500/60 to-indigo-700/60 border border-blue-400/40 flex items-center justify-center">
+                    <span className="text-[6px] font-black text-blue-200/80 tracking-wider">SKYJO</span>
+                  </div>
                 </div>
               </div>
+
+              {/* Front face (card value — revealed after flip) */}
               <div
-                className="absolute inset-x-0 top-0 bg-gradient-to-b from-white/25 to-transparent pointer-events-none"
-                style={{ height: '35%' }}
-              />
+                className="absolute inset-0 rounded-md overflow-hidden shadow-2xl ring-2 ring-gold/70"
+                style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+              >
+                <div className={`absolute inset-0 bg-gradient-to-br ${getCardBg(revealedCard.value)}`} />
+                <div className="absolute inset-[1px] rounded-sm border border-white/25" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-[1px]">
+                    <span className="text-lg font-black text-white drop-shadow-md">{revealedCard.value}</span>
+                  </div>
+                </div>
+                <div
+                  className="absolute inset-x-0 top-0 bg-gradient-to-b from-white/25 to-transparent pointer-events-none"
+                  style={{ height: '35%' }}
+                />
+              </div>
             </div>
           </div>
         )}
