@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { socket } from '../socket/client';
 import { useConnectionStore } from '../stores/connectionStore';
 import { useGameStore } from '../stores/gameStore';
+import { useStatsStore } from '../stores/statsStore';
 
 // Persist session info for reconnection
 function saveSession(playerId: string, roomCode: string) {
@@ -124,10 +125,23 @@ export function useSocket() {
 
     socket.on('round-ended', (data) => {
       setRoundEndData(data);
+      // Record local round stats for the human player (not bots)
+      const { playerId } = useConnectionStore.getState();
+      const state = useGameStore.getState().gameState;
+      const me = state?.players.find((p) => p.id === playerId);
+      if (me && !me.isBot && playerId && data.roundScores[playerId] !== undefined) {
+        useStatsStore.getState().recordRound(me.nickname, data.roundScores[playerId]);
+      }
     });
 
     socket.on('game-ended', (data) => {
       setGameEndData(data);
+      const { playerId } = useConnectionStore.getState();
+      const state = useGameStore.getState().gameState;
+      const me = state?.players.find((p) => p.id === playerId);
+      if (me && !me.isBot && playerId) {
+        useStatsStore.getState().recordGame(me.nickname, data.winnerId === playerId);
+      }
     });
 
     socket.on('error', (payload) => {

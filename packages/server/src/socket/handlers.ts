@@ -66,6 +66,10 @@ export function registerSocketHandlers(
       roomManager.playAgain(io, socket);
     });
 
+    socket.on('emote', (payload) => {
+      roomManager.handleEmote(io, socket, payload);
+    });
+
     socket.on('disconnect', () => {
       console.log(`Client disconnected: ${socket.id}`);
       roomManager.handleDisconnect(io, socket);

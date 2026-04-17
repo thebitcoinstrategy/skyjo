@@ -7,6 +7,7 @@ import {
   type CardValue,
   type CardSlot,
   type RoundEndPayload,
+  type RoundHighlights,
   ROWS,
   CARDS_PER_PLAYER,
   INITIAL_FLIPS,
@@ -332,6 +333,48 @@ export class GameEngine {
       closerPlayerId: closerPlayer.id,
       wasDoubled,
       playerCards,
+      highlights: this.computeHighlights(playerCards, rawScores),
+    };
+  }
+
+  private computeHighlights(
+    playerCards: Record<string, number[]>,
+    rawScores: number[]
+  ): RoundHighlights {
+    let biggestPenalty: { playerId: string; value: number } | null = null;
+    const luckyFlips: string[] = [];
+    let columnsEliminated = 0;
+
+    this.state.players.forEach((p) => {
+      const cards = playerCards[p.id] ?? [];
+      // Columns eliminated: each removed column drops 3 cards from the grid
+      columnsEliminated += Math.max(0, Math.floor((CARDS_PER_PLAYER - cards.length) / ROWS));
+      for (const v of cards) {
+        if (!biggestPenalty || v > biggestPenalty.value) {
+          biggestPenalty = { playerId: p.id, value: v };
+        }
+        if (v === -2) luckyFlips.push(p.id);
+      }
+    });
+
+    let bestPlayer: { playerId: string; rawTotal: number } | null = null;
+    this.state.players.forEach((p, i) => {
+      const raw = rawScores[i];
+      if (!bestPlayer || raw < bestPlayer.rawTotal) {
+        bestPlayer = { playerId: p.id, rawTotal: raw };
+      }
+    });
+
+    // Only flag biggestPenalty if it's actually a "penalty" (positive & notable)
+    if (biggestPenalty && (biggestPenalty as { value: number }).value < 5) {
+      biggestPenalty = null;
+    }
+
+    return {
+      biggestPenalty,
+      bestPlayer,
+      columnsEliminated,
+      luckyFlips: [...new Set(luckyFlips)],
     };
   }
 
@@ -401,8 +444,11 @@ export class GameEngine {
       const playerIndex = this.state.players.indexOf(player);
       this.state.triggeringPlayerIndex = playerIndex;
       this.state.phase = 'final_round';
-      // Everyone else gets one more turn
-      this.state.finalRoundTurnsLeft = this.state.players.length - 1;
+      // Everyone else gets one more turn. advanceTurn() runs once immediately
+      // after this for the triggering turn itself and decrements the counter,
+      // so we set it to players.length so that N-1 other players still get a
+      // full turn before the round ends.
+      this.state.finalRoundTurnsLeft = this.state.players.length;
     }
   }
 

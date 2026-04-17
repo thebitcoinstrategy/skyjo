@@ -44,6 +44,17 @@ export interface RejoinRoomPayload {
   roomCode: string;
 }
 
+export type EmoteKind = 'thumbs-up' | 'tada' | 'sweat' | 'scream' | 'fire' | 'think';
+
+export interface EmotePayload {
+  emote: EmoteKind;
+}
+
+export interface EmoteBroadcastPayload {
+  playerId: string;
+  emote: EmoteKind;
+}
+
 export interface ClientEvents {
   'create-room': (payload: CreateRoomPayload) => void;
   'join-room': (payload: JoinRoomPayload) => void;
@@ -59,6 +70,7 @@ export interface ClientEvents {
   'add-bot': (payload: AddBotPayload) => void;
   'remove-bot': (payload: RemoveBotPayload) => void;
   'play-again': () => void;
+  'emote': (payload: EmotePayload) => void;
 }
 
 // ── Server -> Client Events ──
@@ -115,6 +127,17 @@ export interface AnimationEventPayload {
   data: Record<string, unknown>;
 }
 
+export interface RoundHighlights {
+  /** Player with the single highest-value card at round end, plus the value. */
+  biggestPenalty: { playerId: string; value: number } | null;
+  /** Player with the lowest raw card total this round. */
+  bestPlayer: { playerId: string; rawTotal: number } | null;
+  /** Total columns eliminated this round across all players. */
+  columnsEliminated: number;
+  /** Player IDs who ended the round with at least one -2 flipped. */
+  luckyFlips: string[];
+}
+
 export interface RoundEndPayload {
   roundScores: Record<string, number>;
   totalScores: Record<string, number>;
@@ -123,6 +146,8 @@ export interface RoundEndPayload {
   wasDoubled: boolean;
   /** All card values per player at round end (for counting animation) */
   playerCards: Record<string, number[]>;
+  /** Fun round summary — populated by server, rendered in RoundRecap */
+  highlights: RoundHighlights;
 }
 
 export interface GameEndPayload {
@@ -147,4 +172,5 @@ export interface ServerEvents {
   'game-ended': (payload: GameEndPayload) => void;
   'error': (payload: ErrorPayload) => void;
   'lobby-update': (payload: LobbyPlayer[]) => void;
+  'emote': (payload: EmoteBroadcastPayload) => void;
 }

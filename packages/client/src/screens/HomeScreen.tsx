@@ -3,6 +3,8 @@ import { gsap } from 'gsap';
 import { socket } from '../socket/client';
 import { useConnectionStore } from '../stores/connectionStore';
 import BackgroundArt from '../components/BackgroundArt';
+import RulesOverlay from '../components/RulesOverlay';
+import { useStatsStore } from '../stores/statsStore';
 import { APP_VERSION } from '../version';
 
 const AVATARS = ['😎', '🦊', '🐸', '🦁', '🐼', '🐱', '🐶', '🦄', '🐙', '🎯', '⭐', '🔥', '💎', '🎲', '🃏', '🌟'];
@@ -28,7 +30,12 @@ export default function HomeScreen() {
     return params.get('room') ? 'join' : 'menu';
   });
   const [botCount, setBotCount] = useState(3);
+  const [showRules, setShowRules] = useState(false);
   const error = useConnectionStore((s) => s.error);
+  const statsRevision = useStatsStore((s) => s.revision);
+  const getStats = useStatsStore((s) => s.getStats);
+  const stats = nickname.trim() ? getStats(nickname) : null;
+  void statsRevision; // re-read stats when revision bumps
 
   const titleRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
@@ -104,6 +111,17 @@ export default function HomeScreen() {
         v{APP_VERSION}
       </div>
 
+      {/* Rules button */}
+      <button
+        onClick={() => setShowRules(true)}
+        className="absolute bottom-2 left-3 z-10 w-7 h-7 rounded-full bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/80 text-sm font-bold flex items-center justify-center transition-all"
+        aria-label="Regeln"
+      >
+        ?
+      </button>
+
+      {showRules && <RulesOverlay onClose={() => setShowRules(false)} />}
+
       <div className="relative z-10 w-full max-w-xs flex flex-col items-center">
         {/* Title */}
         <div ref={titleRef} className="mb-6 text-center">
@@ -149,8 +167,19 @@ export default function HomeScreen() {
             onChange={(e) => setNickname(e.target.value)}
             placeholder="Dein Name"
             maxLength={15}
-            className="w-full px-4 py-3 rounded-xl bg-white/8 text-white text-center text-lg placeholder-white/30 border-2 border-white/10 focus:border-gold/60 focus:bg-white/12 focus:outline-none transition-all mb-5"
+            className="w-full px-4 py-3 rounded-xl bg-white/8 text-white text-center text-lg placeholder-white/30 border-2 border-white/10 focus:border-gold/60 focus:bg-white/12 focus:outline-none transition-all mb-3"
           />
+
+          {/* Local stats (per nickname, client-only) */}
+          {stats && stats.gamesPlayed > 0 && (
+            <div className="mb-4 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[11px] text-white/60 text-center font-mono tracking-wide">
+              {stats.gamesPlayed} Spiele · {stats.gamesWon} Siege
+              {stats.bestRoundScore !== null && ` · beste Runde: ${stats.bestRoundScore}`}
+              {stats.currentWinStreak >= 2 && (
+                <span className="text-gold"> · 🔥 {stats.currentWinStreak}</span>
+              )}
+            </div>
+          )}
 
           {error && (
             <div className="mb-4 px-4 py-2.5 bg-red-500/15 border border-red-500/30 rounded-xl text-red-300 text-sm text-center">

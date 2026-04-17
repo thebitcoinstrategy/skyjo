@@ -3,8 +3,10 @@ import { useSettingsStore } from '../stores/settingsStore';
 export default function AudioControls() {
   const musicEnabled = useSettingsStore((s) => s.musicEnabled);
   const sfxEnabled = useSettingsStore((s) => s.sfxEnabled);
+  const reduceAnimations = useSettingsStore((s) => s.reduceAnimations);
   const toggleMusic = useSettingsStore((s) => s.toggleMusic);
   const toggleSfx = useSettingsStore((s) => s.toggleSfx);
+  const toggleReduceAnimations = useSettingsStore((s) => s.toggleReduceAnimations);
 
   return (
     <div className="fixed top-2 right-2 z-50 flex gap-1.5">
@@ -29,6 +31,17 @@ export default function AudioControls() {
         title={sfxEnabled ? 'Effekte aus' : 'Effekte an'}
       >
         {sfxEnabled ? '🔊' : '🔈'}
+      </button>
+      <button
+        onClick={toggleReduceAnimations}
+        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all ${
+          reduceAnimations
+            ? 'bg-white/5 text-white/20 hover:bg-white/10'
+            : 'bg-white/10 text-white/70 hover:bg-white/20'
+        }`}
+        title={reduceAnimations ? 'Animationen an' : 'Animationen reduzieren'}
+      >
+        {reduceAnimations ? '🐢' : '⚡'}
       </button>
     </div>
   );

@@ -3,6 +3,7 @@ import { gsap } from 'gsap';
 import type { CardValue } from '@skyjo/shared';
 import CardIllustration from '../CardIllustration';
 import { soundManager } from '../../audio/SoundManager';
+import { getReduceAnimations } from '../../stores/settingsStore';
 
 interface CardProps {
   value: CardValue | null;
@@ -98,6 +99,13 @@ export default function Card({
 
     // Sound and visual flip are triggered by the same faceUp change, so they stay in sync
     soundManager.play('card-flip');
+
+    // Reduced-motion: snap to target, skip the pop/flip/settle timeline
+    if (getReduceAnimations()) {
+      gsap.set(innerRef.current, { rotateY: targetY });
+      currentRotation.current = targetY;
+      return;
+    }
 
     const isTiny = tiny || small;
     const tl = gsap.timeline();

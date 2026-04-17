@@ -65,3 +65,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       return { reduceAnimations: next };
     }),
 }));
+
+/** Non-subscribing read — safe to call inside GSAP callbacks and one-off effects. */
+export function getReduceAnimations(): boolean {
+  return useSettingsStore.getState().reduceAnimations;
+}

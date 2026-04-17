@@ -5,6 +5,8 @@ import { useConnectionStore } from '../stores/connectionStore';
 import { soundManager } from '../audio/SoundManager';
 import { ROWS } from '@skyjo/shared';
 import Confetti from '../components/Confetti';
+import RoundRecap from '../components/RoundRecap';
+import { getReduceAnimations } from '../stores/settingsStore';
 
 /** Card background color by value (matches Card.tsx getCardStyle) */
 function getCardBg(value: number): string {
@@ -30,6 +32,7 @@ export default function RoundScoringScreen() {
   const [phase, setPhase] = useState<'counting' | 'comparison' | 'closer'>('counting');
   const [showDoubled, setShowDoubled] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [showRecap, setShowRecap] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const closerRef = useRef<HTMLDivElement>(null);
@@ -48,8 +51,9 @@ export default function RoundScoringScreen() {
     const cardValues = players.map((p) => playerCards[p.id] ?? []);
     const maxCards = Math.max(...cardValues.map((c) => c.length));
 
-    let delay = 500; // Initial delay
-    const cardDelay = 120; // ms between each card reveal
+    const reduced = getReduceAnimations();
+    let delay = reduced ? 0 : 500; // Initial delay
+    const cardDelay = reduced ? 0 : 120; // ms between each card reveal
 
     // Reveal cards column by column (left to right, top to bottom)
     for (let cardIdx = 0; cardIdx < maxCards; cardIdx++) {
@@ -85,7 +89,7 @@ export default function RoundScoringScreen() {
     }
 
     // After all cards revealed, move to comparison phase
-    const totalDuration = delay + maxCards * cardDelay + 400;
+    const totalDuration = delay + maxCards * cardDelay + (reduced ? 0 : 400);
     setTimeout(() => {
       setPhase('comparison');
     }, totalDuration);
@@ -105,8 +109,8 @@ export default function RoundScoringScreen() {
         if (wasDoubled) {
           setShowDoubled(true);
         }
-      }, 300);
-    }, totalDuration + 1200);
+      }, reduced ? 0 : 300);
+    }, totalDuration + (reduced ? 200 : 1200));
   }, [roundEndData, players, playerCards, wasDoubled]);
 
   useEffect(() => {
@@ -127,6 +131,10 @@ export default function RoundScoringScreen() {
   }, [phase]);
 
   const handleContinue = () => {
+    if (roundEndData?.highlights && !showRecap) {
+      setShowRecap(true);
+      return;
+    }
     setScoringDone(true);
   };
 
@@ -141,7 +149,8 @@ export default function RoundScoringScreen() {
   }));
 
   if (phase === 'comparison' || phase === 'closer') {
-    sortedPlayers.sort((a, b) => a.rawTotal - b.rawTotal);
+    // Order by final round score (includes doubling penalty). Lowest = best.
+    sortedPlayers.sort((a, b) => a.roundScore - b.roundScore);
   }
 
   const closerPlayer = players.find((p) => p.id === closerPlayerId);
@@ -150,6 +159,13 @@ export default function RoundScoringScreen() {
   return (
     <div className="h-full flex flex-col items-center relative overflow-hidden">
       <Confetti active={showConfetti} />
+      {showRecap && roundEndData.highlights && (
+        <RoundRecap
+          highlights={roundEndData.highlights}
+          players={players}
+          onDone={() => setScoringDone(true)}
+        />
+      )}
       <div className="absolute inset-0 bg-gradient-to-b from-[#1b0f0a] via-felt to-[#1b0f0a]" />
       <div className="absolute inset-0 felt-texture" />
       <div className="absolute inset-0 felt-noise" />

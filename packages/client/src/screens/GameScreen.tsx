@@ -9,9 +9,12 @@ import DrawPile from '../components/DrawPile';
 import DiscardPile from '../components/DiscardPile';
 import DrawnCard from '../components/DrawnCard';
 import TurnIndicator from '../components/TurnIndicator';
-import type { AnimationEventPayload, CardValue } from '@skyjo/shared';
+import type { AnimationEventPayload, CardValue, EmoteKind, EmoteBroadcastPayload } from '@skyjo/shared';
 import BackgroundArt from '../components/BackgroundArt';
 import { soundManager } from '../audio/SoundManager';
+import { getReduceAnimations } from '../stores/settingsStore';
+import EmotePicker, { EMOTES } from '../components/EmotePicker';
+import FloatingEmote from '../components/FloatingEmote';
 
 /* ── Drag ghost ── */
 function DragGhost({ value, x, y }: { value: CardValue | null; x: number; y: number }) {
@@ -79,6 +82,11 @@ const FlyingCard = forwardRef<HTMLDivElement, {
 
   useEffect(() => {
     if (!innerRef.current) return;
+    if (getReduceAnimations()) {
+      gsap.set(innerRef.current, { opacity: 0 });
+      onDone?.();
+      return;
+    }
     const tl = gsap.timeline({ onComplete: onDone });
     tl.fromTo(
       innerRef.current,
@@ -151,6 +159,11 @@ const DisplacedCard = forwardRef<HTMLDivElement, {
 
   useEffect(() => {
     if (!containerRef.current || !flipInnerRef.current) return;
+    if (getReduceAnimations()) {
+      gsap.set(containerRef.current, { opacity: 0 });
+      onDone();
+      return;
+    }
     const tl = gsap.timeline({ onComplete: onDone });
 
     if (wasFaceDown) {
@@ -382,6 +395,47 @@ export default function GameScreen() {
   const flyingCardRef = useRef<HTMLDivElement>(null);
   const flyingCardResolveRef = useRef<(() => void) | null>(null);
 
+  // ── Emotes ──
+  const [showEmotePicker, setShowEmotePicker] = useState(false);
+  const [floatingEmotes, setFloatingEmotes] = useState<
+    { id: string; char: string; x: number; y: number }[]
+  >([]);
+  const lastEmoteSentRef = useRef(0);
+
+  useEffect(() => {
+    const onEmote = (payload: EmoteBroadcastPayload) => {
+      const def = EMOTES.find((e) => e.kind === payload.emote);
+      if (!def) return;
+      // Anchor to the player's seat via existing data-player-id attribute
+      const el = document.querySelector(`[data-player-id="${payload.playerId}"]`);
+      let x = window.innerWidth / 2;
+      let y = window.innerHeight - 150;
+      if (el) {
+        const r = el.getBoundingClientRect();
+        x = r.left + r.width / 2;
+        y = r.top + r.height / 2;
+      } else if (payload.playerId === playerId && myHandRef.current) {
+        const r = myHandRef.current.getBoundingClientRect();
+        x = r.left + r.width / 2;
+        y = r.top + 20;
+      }
+      const id = `emote-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      setFloatingEmotes((prev) => [...prev, { id, char: def.char, x, y }]);
+    };
+    socket.on('emote', onEmote);
+    return () => {
+      socket.off('emote', onEmote);
+    };
+  }, [playerId]);
+
+  const sendEmote = useCallback((kind: EmoteKind) => {
+    const now = Date.now();
+    if (now - lastEmoteSentRef.current < 2000) return;
+    lastEmoteSentRef.current = now;
+    socket.emit('emote', { emote: kind });
+    setShowEmotePicker(false);
+  }, []);
+
   // ── Round-end card reveal: stagger-flip face-down cards one by one ──
   const revealingCards = useGameStore((s) => s.revealingCards);
   const preRevealSnapshot = useGameStore((s) => s.preRevealSnapshot);
@@ -406,9 +460,10 @@ export default function GameScreen() {
       return;
     }
 
-    // Stagger reveal with 150ms between each card
-    const delay = 200; // initial pause
-    const interval = 150;
+    // Stagger reveal with 150ms between each card (instant when animations are reduced)
+    const reduced = getReduceAnimations();
+    const delay = reduced ? 0 : 200;
+    const interval = reduced ? 0 : 150;
     const timers: ReturnType<typeof setTimeout>[] = [];
 
     toReveal.forEach((item, i) => {
@@ -425,7 +480,7 @@ export default function GameScreen() {
     timers.push(setTimeout(() => {
       setRevealingCards(false);
       setRevealedSet(new Set());
-    }, delay + toReveal.length * interval + 600));
+    }, delay + toReveal.length * interval + (reduced ? 0 : 600)));
 
     return () => timers.forEach(clearTimeout);
   }, [revealingCards, preRevealSnapshot, gameState, setRevealingCards]);
@@ -454,11 +509,22 @@ export default function GameScreen() {
     switch (event.type) {
       case 'flip-card': {
         // Card component handles both the flip animation and its sound via faceUp prop change
-        await new Promise((r) => setTimeout(r, isMe ? 600 : 700));
+        const d = getReduceAnimations() ? 150 : (isMe ? 600 : 700);
+        await new Promise((r) => setTimeout(r, d));
         break;
       }
       case 'column-eliminate': {
         soundManager.play('column-eliminate');
+        const reduced = getReduceAnimations();
+        if (isMe && reduced) {
+          // Minimal acknowledgement — brief flash only, skip confetti/TTS/glow
+          setScreenFlash(true);
+          setTimeout(() => setScreenFlash(false), 200);
+          setCelebrationText('SPALTE WEG! 🎉');
+          setTimeout(() => setCelebrationText(null), 800);
+          await new Promise((r) => setTimeout(r, 600));
+          break;
+        }
         if (isMe) {
           // === MEGA CELEBRATION ===
 
@@ -1066,6 +1132,17 @@ export default function GameScreen() {
         );
       })}
 
+      {/* ═══ FLOATING EMOTES ═══ */}
+      {floatingEmotes.map((e) => (
+        <FloatingEmote
+          key={e.id}
+          char={e.char}
+          x={e.x}
+          y={e.y}
+          onDone={() => setFloatingEmotes((prev) => prev.filter((p) => p.id !== e.id))}
+        />
+      ))}
+
       {/* ═══ DRAG GHOST ═══ */}
       {isDragging && (
         <DragGhost value={gameState.drawnCard ?? dragPreviewValue} x={dragPos.x} y={dragPos.y} />
@@ -1215,9 +1292,22 @@ export default function GameScreen() {
           }`}
         >
           <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xl">{me.avatar}</span>
-              <span className="text-white font-bold text-sm">{me.nickname}</span>
+            <div className="flex items-center gap-1.5 relative">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowEmotePicker((v) => !v);
+                }}
+                className="flex items-center gap-1.5 px-1 py-0.5 rounded hover:bg-white/10 active:scale-95 transition-all"
+                aria-label="Emote senden"
+              >
+                <span className="text-xl">{me.avatar}</span>
+                <span className="text-white font-bold text-sm">{me.nickname}</span>
+                <span className="text-[10px] text-white/30 ml-0.5">😊</span>
+              </button>
+              {showEmotePicker && (
+                <EmotePicker onPick={sendEmote} onClose={() => setShowEmotePicker(false)} />
+              )}
             </div>
             <span
               className={`text-xs font-mono font-black ${

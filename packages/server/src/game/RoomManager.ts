@@ -11,6 +11,8 @@ import type {
   AddBotPayload,
   RemoveBotPayload,
   StartSinglePlayerPayload,
+  EmotePayload,
+  EmoteKind,
   LobbyPlayer,
 } from '@skyjo/shared';
 import { MAX_PLAYERS, MIN_PLAYERS } from '@skyjo/shared';
@@ -50,6 +52,12 @@ interface Room {
 const socketRoomMap = new Map<string, string>();
 // Map socketId -> stable playerId
 const socketToPlayer = new Map<string, string>();
+// Map playerId -> last emote timestamp (ms) for rate limiting
+const lastEmoteAt = new Map<string, number>();
+const EMOTE_COOLDOWN_MS = 2000;
+const ALLOWED_EMOTES: ReadonlySet<EmoteKind> = new Set([
+  'thumbs-up', 'tada', 'sweat', 'scream', 'fire', 'think',
+]);
 
 export class RoomManager {
   private rooms = new Map<string, Room>();
@@ -649,6 +657,24 @@ export class RoomManager {
         lobby: this.getLobbyPlayers(room),
       });
     }
+  }
+
+  handleEmote(
+    io: Server<ClientEvents, ServerEvents>,
+    socket: Socket<ClientEvents, ServerEvents>,
+    payload: EmotePayload
+  ): void {
+    if (!payload || !ALLOWED_EMOTES.has(payload.emote)) return;
+    const room = this.getRoom(socket);
+    const playerId = this.getPlayerId(socket);
+    if (!room || !playerId) return;
+
+    const now = Date.now();
+    const last = lastEmoteAt.get(playerId) ?? 0;
+    if (now - last < EMOTE_COOLDOWN_MS) return;
+    lastEmoteAt.set(playerId, now);
+
+    io.to(room.code).emit('emote', { playerId, emote: payload.emote });
   }
 
   private getRoom(socket: Socket): Room | null {
