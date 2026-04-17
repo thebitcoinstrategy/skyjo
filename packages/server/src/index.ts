@@ -4,6 +4,8 @@ import fastifyStatic from '@fastify/static';
 import { Server } from 'socket.io';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import fs from 'fs';
+import crypto from 'crypto';
 import { registerSocketHandlers } from './socket/handlers.js';
 import type { ClientEvents, ServerEvents } from '@skyjo/shared';
 
@@ -35,6 +37,24 @@ if (process.env.NODE_ENV === 'production') {
 // Health check
 app.get('/api/health', async () => {
   return { status: 'ok', timestamp: Date.now() };
+});
+
+// Version check — used by the client to detect new deploys and force a
+// reload when the currently-running bundle is stale.
+const BUILD_ID = (() => {
+  try {
+    const indexHtml = path.resolve(__dirname, '../../client/dist/index.html');
+    const stat = fs.statSync(indexHtml);
+    const buf = fs.readFileSync(indexHtml);
+    return crypto.createHash('sha1').update(buf).digest('hex').slice(0, 10) + '-' + stat.mtimeMs;
+  } catch {
+    return String(Date.now());
+  }
+})();
+
+app.get('/api/version', async (_req, reply) => {
+  reply.header('Cache-Control', 'no-store, no-cache, must-revalidate');
+  return { version: process.env.APP_VERSION ?? 'unknown', build: BUILD_ID };
 });
 
 // Start Fastify first, then attach Socket.IO to its underlying http server

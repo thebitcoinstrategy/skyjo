@@ -10,6 +10,15 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'sounds/**/*'],
+      // Force any waiting service worker to activate on the next page load and
+      // take over existing clients, and wipe caches from older precache manifests.
+      // Without these, iOS/Android PWAs can keep serving the old bundle until
+      // the user manually clears site data.
+      workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
+      },
       manifest: {
         name: 'Kuschnik SkyJo',
         short_name: 'SkyJo',
