@@ -126,10 +126,7 @@ export default function HomeScreen() {
       <div className="relative z-10 w-full max-w-xs flex flex-col items-center">
         {/* Title */}
         <div ref={titleRef} className="mb-6 text-center">
-          <p className="text-gold text-2xl tracking-[0.3em] uppercase font-black mb-0 drop-shadow-[0_2px_8px_rgba(245,193,108,0.25)]">
-            Kuschnik
-          </p>
-          <h1 className="text-7xl font-black tracking-tight title-shimmer drop-shadow-[0_2px_12px_rgba(245,193,108,0.4)] -mt-1">
+          <h1 className="text-7xl font-black tracking-tight title-shimmer drop-shadow-[0_2px_12px_rgba(245,193,108,0.4)]">
             SKYJO
           </h1>
           <div className="flex items-center justify-center gap-2 mt-1">

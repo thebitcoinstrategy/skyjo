@@ -20,7 +20,7 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
       },
       manifest: {
-        name: 'Kuschnik SkyJo',
+        name: 'SkyJo',
         short_name: 'SkyJo',
         description: 'Spiele SkyJo mit Freunden und Familie!',
         theme_color: '#1b0f0a',
