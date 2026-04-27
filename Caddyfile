@@ -1,3 +1,3 @@
-skyjo.168.144.44.168.sslip.io {
+skyjo.tech, www.skyjo.tech {
     reverse_proxy app:3000
 }
